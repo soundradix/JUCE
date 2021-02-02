@@ -1171,21 +1171,30 @@ namespace WavFileHelpers
     }
 
     //==============================================================================
-    struct ExtensibleWavSubFormat
+    struct ExtensibleAudioSubformat
     {
         uint32 data1;
         uint16 data2;
         uint16 data3;
         uint8  data4[8];
 
-        bool operator== (const ExtensibleWavSubFormat& other) const noexcept   { return memcmp (this, &other, sizeof (*this)) == 0; }
-        bool operator!= (const ExtensibleWavSubFormat& other) const noexcept   { return ! operator== (other); }
+        bool operator== (const ExtensibleAudioSubformat& other) const noexcept   { return memcmp (this, &other, sizeof (*this)) == 0; }
+        bool operator!= (const ExtensibleAudioSubformat& other) const noexcept   { return ! operator== (other); }
 
     } JUCE_PACKED;
 
-    static const ExtensibleWavSubFormat pcmFormat       = { 0x00000001, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
-    static const ExtensibleWavSubFormat IEEEFloatFormat = { 0x00000003, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
-    static const ExtensibleWavSubFormat ambisonicFormat = { 0x00000001, 0x0721, 0x11d3, { 0x86, 0x44, 0xC8, 0xC1, 0xCA, 0x00, 0x00, 0x00 } };
+    static const ExtensibleAudioSubformat pcmFormat       = { 0x00000001, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat IEEEFloatFormat = { 0x00000003, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat ambisonicFormat = { 0x00000001, 0x0721, 0x11d3, { 0x86, 0x44, 0xc8, 0xc1, 0xca, 0x00, 0x00, 0x00 } };
+    static const ExtensibleAudioSubformat aLawFormat      = { 0x00000006, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat muLawFormat     = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis1Format   = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x9b, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis2Format   = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis3Format   = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis1PFormat  = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis2PFormat  = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat vorbis3PFormat  = { 0x00000007, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
+    static const ExtensibleAudioSubformat flacFormat      = { 0x0000ffff, 0x0000, 0x0010, { 0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71 } };
 
     struct DataSize64Chunk   // chunk ID = 'ds64' if data size > 0xffffffff, 'JUNK' otherwise
     {
@@ -1262,19 +1271,19 @@ public:
                 if (chunkType == chunkName ("fmt "))
                 {
                     // read the format chunk
-                    auto format = (unsigned short) input->readShort();
-                    numChannels = (unsigned int) input->readShort();
-                    sampleRate = input->readInt();
-                    auto bytesPerSec = input->readInt();
+                    const auto format = (uint16) input->readShort();
+                    numChannels = (uint32) input->readShort();
+                    sampleRate = (double) input->readInt();
+                    const auto bytesPerSec = input->readInt();
                     input->skipNextBytes (2);
-                    bitsPerSample = (unsigned int) (int) input->readShort();
+                    bitsPerSample = (uint32) (int) input->readShort();
 
                     if (bitsPerSample > 64 && (int) sampleRate != 0)
                     {
                         bytesPerFrame = bytesPerSec / (int) sampleRate;
 
-                        if (numChannels != 0)
-                            bitsPerSample = 8 * (unsigned int) bytesPerFrame / numChannels;
+                        if (numChannels > 0)
+                            bitsPerSample = 8 * (uint32) bytesPerFrame / numChannels;
                     }
                     else
                     {
@@ -1285,6 +1294,20 @@ public:
                     {
                         usesFloatingPointData = true;
                     }
+                    else if (format == 0x0006) // WAVE_FORMAT_ALAW
+                    {
+                        subformat = AudioSubformat::aLaw;
+                    }
+                    else if (format == 0x0007) // WAVE_FORMAT_MULAW
+                    {
+                        subformat = AudioSubformat::muLaw;
+                    }
+                    else if (format == 0x0031   // WAVE_FORMAT_GSM610
+                          || format == 0x0086   // WAVE_FORMAT_DF_GSM610
+                          || format == 0xa10d)  // WAVE_FORMAT_GSM_610 // MSFT... wtf?
+                    {
+                        subformat = AudioSubformat::gsm610;
+                    }
                     else if (format == 0xfffe) // WAVE_FORMAT_EXTENSIBLE
                     {
                         if (length < 40) // too short
@@ -1294,20 +1317,45 @@ public:
                         else
                         {
                             input->skipNextBytes (4); // skip over size and bitsPerSample
-                            auto channelMask = input->readInt();
+                            const auto channelMask = input->readInt();
                             dict["ChannelMask"] = String (channelMask);
                             channelLayout = getChannelLayoutFromMask (channelMask, numChannels);
 
-                            ExtensibleWavSubFormat subFormat;
+                            ExtensibleAudioSubformat subFormat;
                             subFormat.data1 = (uint32) input->readInt();
                             subFormat.data2 = (uint16) input->readShort();
                             subFormat.data3 = (uint16) input->readShort();
                             input->read (subFormat.data4, sizeof (subFormat.data4));
 
                             if (subFormat == IEEEFloatFormat)
+                            {
                                 usesFloatingPointData = true;
+                            }
+                            else if (subFormat == aLawFormat)
+                            {
+                                subformat = AudioSubformat::aLaw;
+                            }
+                            else if (subFormat == muLawFormat)
+                            {
+                                subformat = AudioSubformat::muLaw;
+                            }
+                            else if (subFormat == vorbis1Format 
+                                  || subFormat == vorbis2Format 
+                                  || subFormat == vorbis3Format 
+                                  || subFormat == vorbis1PFormat
+                                  || subFormat == vorbis2PFormat
+                                  || subFormat == vorbis3PFormat
+                                  || subFormat == flacFormat)
+                            {
+                                subformat = subFormat == flacFormat ? AudioSubformat::flac : AudioSubformat::oggVorbis;
+                                sampleRate = 0.0; // to mark the wav reader as failed
+                                input->setPosition (streamStartPos);
+                                return;
+                            }
                             else if (subFormat != pcmFormat && subFormat != ambisonicFormat)
+                            {
                                 bytesPerFrame = 0;
+                            }
                         }
                     }
                     else if (format == 0x674f  // WAVE_FORMAT_OGG_VORBIS_MODE_1
@@ -1315,10 +1363,12 @@ public:
                           || format == 0x6751  // WAVE_FORMAT_OGG_VORBIS_MODE_3
                           || format == 0x676f  // WAVE_FORMAT_OGG_VORBIS_MODE_1_PLUS
                           || format == 0x6770  // WAVE_FORMAT_OGG_VORBIS_MODE_2_PLUS
-                          || format == 0x6771) // WAVE_FORMAT_OGG_VORBIS_MODE_3_PLUS
+                          || format == 0x6771  // WAVE_FORMAT_OGG_VORBIS_MODE_3_PLUS
+                          || format == 0x564c  // WAVE_FORMAT_LEAD_VORBIS
+                          || format == 0xf1ac) // WAVE_FORMAT_FLAC
                     {
-                        isSubformatOggVorbis = true;
-                        sampleRate = 0; // to mark the wav reader as failed
+                        subformat = format == 0xf1ac ? AudioSubformat::flac : AudioSubformat::oggVorbis;
+                        sampleRate = 0.0; // to mark the wav reader as failed
                         input->setPosition (streamStartPos);
                         return;
                     }
@@ -1326,6 +1376,11 @@ public:
                     {
                         bytesPerFrame = 0;
                     }
+
+                    // Mu-Law and A-Law only support 8k sample rates.
+                    if (subformat == AudioSubformat::aLaw || subformat == AudioSubformat::muLaw)
+                        if (! approximatelyEqual (sampleRate, 8000.0))
+                            sampleRate = 0.0;
                 }
                 else if (chunkType == chunkName ("data"))
                 {
@@ -1489,7 +1544,7 @@ public:
 
         while (numSamples > 0)
         {
-            const int tempBufSize = 480 * 3 * 4; // (keep this a multiple of 3)
+            constexpr auto tempBufSize = 480 * 3 * 4; // (keep this a multiple of 3)
             char tempBuffer[tempBufSize];
 
             auto numThisTime = jmin (tempBufSize / bytesPerFrame, numSamples);
@@ -1501,7 +1556,7 @@ public:
                 zeromem (tempBuffer + bytesRead, (size_t) (numThisTime * bytesPerFrame - bytesRead));
             }
 
-            copySampleData (bitsPerSample, usesFloatingPointData,
+            copySampleData (bitsPerSample, usesFloatingPointData, subformat,
                             destSamples, startOffsetInDestBuffer, numDestChannels,
                             tempBuffer, (int) numChannels, numThisTime);
 
@@ -1512,17 +1567,30 @@ public:
         return true;
     }
 
-    static void copySampleData (unsigned int numBitsPerSample, const bool floatingPointData,
+    static void copySampleData (uint32 numBitsPerSample, bool floatingPointData, AudioSubformat subformat,
                                 int* const* destSamples, int startOffsetInDestBuffer, int numDestChannels,
                                 const void* sourceData, int numberOfChannels, int numSamples) noexcept
     {
         switch (numBitsPerSample)
         {
-            case 8:     ReadHelper<AudioData::Int32, AudioData::UInt8, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+            case 8:
+                switch (subformat)
+                {
+                    case AudioSubformat::aLaw:    ReadHelper<AudioData::Int32, AudioData::UInt8ALaw,  AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                    case AudioSubformat::muLaw:   ReadHelper<AudioData::Int32, AudioData::UInt8MuLaw, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                    default:                    ReadHelper<AudioData::Int32, AudioData::Int8,       AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                };
+            break;
+
+            case 12:    ReadHelper<AudioData::Int32, AudioData::Int12, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 16:    ReadHelper<AudioData::Int32, AudioData::Int16, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+            case 20:    ReadHelper<AudioData::Int32, AudioData::Int20, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 24:    ReadHelper<AudioData::Int32, AudioData::Int24, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 32:    if (floatingPointData) ReadHelper<AudioData::Float32, AudioData::Float32, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
                         else                   ReadHelper<AudioData::Int32,   AudioData::Int32,   AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
+                        break;
+            case 64:    if (floatingPointData) ReadHelper<AudioData::Float32, AudioData::Float64, AudioData::LittleEndian>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
+                        else jassertfalse;
                         break;
             default:    jassertfalse; break;
         }
@@ -1553,7 +1621,9 @@ public:
             // for backward compatibility with old wav files, assume 1 or 2
             // channel wav files are mono/stereo respectively
             if (totalNumChannels <= 2 && dwChannelMask == 0)
+            {
                 wavFileChannelLayout = AudioChannelSet::canonicalChannelSet (static_cast<int> (totalNumChannels));
+            }
             else
             {
                 auto discreteSpeaker = static_cast<int> (AudioChannelSet::discreteChannel0);
@@ -1566,11 +1636,11 @@ public:
         return wavFileChannelLayout;
     }
 
+    AudioSubformat subformat = AudioSubformat::regular;
     int64 bwavChunkStart = 0, bwavSize = 0;
     int64 dataChunkStart = 0, dataLength = 0;
     int bytesPerFrame = 0;
     bool isRF64 = false;
-    bool isSubformatOggVorbis = false;
 
     AudioChannelSet channelLayout;
 
@@ -1628,7 +1698,7 @@ public:
         if (writeFailed)
             return false;
 
-        auto bytes = numChannels * (size_t) numSamples * bitsPerSample / 8;
+        const auto bytes = (size_t) (numChannels * (uint32) numSamples * bitsPerSample / 8);
         tempBlock.ensureSize (bytes, false);
 
         switch (bitsPerSample)
@@ -1642,7 +1712,7 @@ public:
 
         if (! output->write (tempBlock.getData(), bytes))
         {
-            // failed to write to disk, so let's try writing the header.
+            // Failed to write to disk, so let's try writing the header.
             // If it's just run out of disk space, then if it does manage
             // to write the header, we'll still have a usable file..
             writeHeader();
@@ -1684,17 +1754,17 @@ private:
 
         if (headerPosition != output->getPosition() && ! output->setPosition (headerPosition))
         {
-            // if this fails, you've given it an output stream that can't seek! It needs to be
+            // If this fails, you've given it an output stream that can't seek! It needs to be
             // able to seek back to go back and write the header after the data has been written.
             jassertfalse;
             return;
         }
 
-        const size_t bytesPerFrame = numChannels * bitsPerSample / 8;
-        uint64 audioDataSize = bytesPerFrame * lengthInSamples;
+        const auto bytesPerFrame = numChannels * bitsPerSample / (uint32) 8;
+        auto audioDataSize = (uint64) bytesPerFrame * lengthInSamples;
         auto channelMask = getChannelMaskFromChannelLayout (channelLayout);
 
-        const bool isRF64 = (bytesWritten >= 0x100000000LL);
+        const bool isRF64 = bytesWritten >= 0x100000000LL;
         const bool isWaveFmtEx = isRF64 || (channelMask != 0);
 
         int64 riffChunkSize = (int64) (4 /* 'RIFF' */ + 8 + 40 /* WAVEFORMATEX */
@@ -1774,7 +1844,7 @@ private:
             output->writeShort ((short) bitsPerSample); // wValidBitsPerSample
             output->writeInt (channelMask);
 
-            const ExtensibleWavSubFormat& subFormat = bitsPerSample < 32 ? pcmFormat : IEEEFloatFormat;
+            const auto& subFormat = bitsPerSample < 32 ? pcmFormat : IEEEFloatFormat;
 
             output->writeInt ((int) subFormat.data1);
             output->writeShort ((short) subFormat.data2);
@@ -1795,7 +1865,7 @@ private:
 
         writeChunkHeader (chunkName ("data"), isRF64 ? -1 : (int) (lengthInSamples * bytesPerFrame));
 
-        usesFloatingPointData = (bitsPerSample == 32);
+        usesFloatingPointData = bitsPerSample == 32 || bitsPerSample == 64;
     }
 
     static size_t chunkSize (const MemoryBlock& data) noexcept     { return data.isEmpty() ? 0 : (8 + data.getSize()); }
@@ -1825,12 +1895,11 @@ private:
         if (layout == AudioChannelSet::mono() || layout == AudioChannelSet::stereo())
             return 0;
 
-        auto channels = layout.getChannelTypes();
         auto wavChannelMask = 0;
 
-        for (auto channel : channels)
+        for (auto channel : layout.getChannelTypes())
         {
-            int wavChannelBit = static_cast<int> (channel) - 1;
+            auto wavChannelBit = static_cast<int> (channel) - 1;
             jassert (wavChannelBit >= 0 && wavChannelBit <= 31);
 
             wavChannelMask |= (1 << wavChannelBit);
@@ -1848,7 +1917,8 @@ class MemoryMappedWavReader final : public MemoryMappedAudioFormatReader
 public:
     MemoryMappedWavReader (const File& wavFile, const WavAudioFormatReader& reader)
         : MemoryMappedAudioFormatReader (wavFile, reader, reader.dataChunkStart,
-                                         reader.dataLength, reader.bytesPerFrame)
+                                         reader.dataLength, reader.bytesPerFrame),
+          subformat (reader.subformat)
     {
     }
 
@@ -1867,7 +1937,7 @@ public:
             return false;
         }
 
-        WavAudioFormatReader::copySampleData (bitsPerSample, usesFloatingPointData,
+        WavAudioFormatReader::copySampleData (bitsPerSample, usesFloatingPointData, subformat,
                                               destSamples, startOffsetInDestBuffer, numDestChannels,
                                               sampleToPointer (startSampleInFile), (int) numChannels, numSamples);
         return true;
@@ -1890,11 +1960,24 @@ public:
 
         switch (bitsPerSample)
         {
-            case 8:     ReadHelper<AudioData::Float32, AudioData::UInt8, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+            case 8:
+                switch (subformat)
+                {
+                    case AudioSubformat::aLaw:    ReadHelper<AudioData::Float32, AudioData::UInt8ALaw,  AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                    case AudioSubformat::muLaw:   ReadHelper<AudioData::Float32, AudioData::UInt8MuLaw, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                    default:                    ReadHelper<AudioData::Float32, AudioData::UInt8,      AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                };
+            break;
+
+            case 12:    ReadHelper<AudioData::Float32, AudioData::Int12, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
             case 16:    ReadHelper<AudioData::Float32, AudioData::Int16, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+            case 20:    ReadHelper<AudioData::Float32, AudioData::Int20, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
             case 24:    ReadHelper<AudioData::Float32, AudioData::Int24, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
             case 32:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float32, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
                         else                       ReadHelper<AudioData::Float32, AudioData::Int32,   AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
+                        break;
+            case 64:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float64, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
+                        else jassertfalse;
                         break;
             default:    jassertfalse; break;
         }
@@ -1916,11 +1999,24 @@ public:
 
         switch (bitsPerSample)
         {
-            case 8:     scanMinAndMax<AudioData::UInt8> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+            case 8:
+                switch (subformat)
+                {
+                    case AudioSubformat::aLaw:    scanMinAndMax<AudioData::UInt8ALaw> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                    case AudioSubformat::muLaw:   scanMinAndMax<AudioData::UInt8MuLaw> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                    default:                    scanMinAndMax<AudioData::UInt8> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                };
+            break;
+
+            case 12:    scanMinAndMax<AudioData::Int16> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 16:    scanMinAndMax<AudioData::Int16> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+            case 20:    scanMinAndMax<AudioData::Int20> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 24:    scanMinAndMax<AudioData::Int24> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 32:    if (usesFloatingPointData) scanMinAndMax<AudioData::Float32> (startSampleInFile, numSamples, results, numChannelsToRead);
                         else                       scanMinAndMax<AudioData::Int32>   (startSampleInFile, numSamples, results, numChannelsToRead);
+                        break;
+            case 64:    if (usesFloatingPointData) scanMinAndMax<AudioData::Float64> (startSampleInFile, numSamples, results, numChannelsToRead);
+                        else jassertfalse;
                         break;
             default:    jassertfalse; break;
         }
@@ -1929,6 +2025,8 @@ public:
     using AudioFormatReader::readMaxLevels;
 
 private:
+    const AudioSubformat subformat;
+
     template <typename SampleType>
     void scanMinAndMax (int64 startSampleInFile, int64 numSamples, Range<float>* results, int numChannelsToRead) const noexcept
     {
@@ -1940,33 +2038,26 @@ private:
 };
 
 //==============================================================================
-WavAudioFormat::WavAudioFormat()  : AudioFormat (wavFormatName, ".wav .bwf") {}
+WavAudioFormat::WavAudioFormat()  : AudioFormat (wavFormatName, ".wav .wave .w64 .bwf") {}
 WavAudioFormat::~WavAudioFormat() {}
 
 Array<int> WavAudioFormat::getPossibleSampleRates()
 {
-    return { 8000,  11025, 12000, 16000,  22050,  32000,  44100,
-             48000, 88200, 96000, 176400, 192000, 352800, 384000 };
+    return { 8000, 10000, 11025, 12000, 14000, 16000, 18000, 20000, 22050, 24000, 28000, 32000,
+             36000, 44100, 48000, 56000, 64000, 88200, 96000, 176400, 192000, 352800, 384000 };
 }
 
-Array<int> WavAudioFormat::getPossibleBitDepths()
-{
-    return { 8, 16, 24, 32 };
-}
-
-bool WavAudioFormat::canDoStereo()  { return true; }
-bool WavAudioFormat::canDoMono()    { return true; }
+Array<int> WavAudioFormat::getPossibleBitDepths()   { return { 8, 12, 16, 20, 24, 32, 64 }; }
+bool WavAudioFormat::canDoStereo()                  { return true; }
+bool WavAudioFormat::canDoMono()                    { return true; }
 
 bool WavAudioFormat::isChannelLayoutSupported (const AudioChannelSet& channelSet)
 {
-    auto channelTypes = channelSet.getChannelTypes();
-
-    // When
     if (channelSet.isDiscreteLayout())
         return true;
 
-    // WAV supports all channel types from left ... topRearRight
-    for (auto channel : channelTypes)
+    // When WAV supports all channel types from left ... topRearRight
+    for (auto channel : channelSet.getChannelTypes())
         if (channel < AudioChannelSet::left || channel > AudioChannelSet::topRearRight)
             return false;
 
@@ -1975,17 +2066,32 @@ bool WavAudioFormat::isChannelLayoutSupported (const AudioChannelSet& channelSet
 
 AudioFormatReader* WavAudioFormat::createReaderFor (InputStream* sourceStream, bool deleteStreamIfOpeningFails)
 {
-    std::unique_ptr<WavAudioFormatReader> r (new WavAudioFormatReader (sourceStream));
+    auto r = std::make_unique<WavAudioFormatReader> (sourceStream);
 
    #if JUCE_USE_OGGVORBIS
-    if (r->isSubformatOggVorbis)
+    if (r->subformat == AudioSubformat::oggVorbis)
     {
         r->input = nullptr;
         return OggVorbisAudioFormat().createReaderFor (sourceStream, deleteStreamIfOpeningFails);
     }
    #endif
 
-    if (r->sampleRate > 0 && r->numChannels > 0 && r->bytesPerFrame > 0 && r->bitsPerSample <= 32)
+   #if JUCE_USE_FLAC
+    if (r->subformat == AudioSubformat::flac)
+    {
+        r->input = nullptr;
+        return FlacAudioFormat().createReaderFor (sourceStream, deleteStreamIfOpeningFails);
+    }
+   #endif
+
+    bool ok = r->sampleRate > 0.0
+           && r->numChannels > 0
+           && getPossibleBitDepths().contains ((int) r->bitsPerSample);
+
+    if (ok && r->usesFloatingPointData)
+        ok = r->bitsPerSample == 32 || r->bitsPerSample == 64;
+
+    if (ok)
         return r.release();
 
     if (! deleteStreamIfOpeningFails)
@@ -2028,8 +2134,7 @@ AudioFormatWriter* WavAudioFormat::createWriterFor (OutputStream* out,
                                                     int /*qualityOptionIndex*/)
 {
     if (out != nullptr && getPossibleBitDepths().contains (bitsPerSample) && isChannelLayoutSupported (channelLayout))
-        return new WavAudioFormatWriter (out, sampleRate, channelLayout,
-                                         (unsigned int) bitsPerSample, metadataValues);
+        return new WavAudioFormatWriter (out, sampleRate, channelLayout, (unsigned int) bitsPerSample, metadataValues);
 
     return nullptr;
 }
@@ -2045,9 +2150,7 @@ namespace WavFileHelpers
 
         if (reader != nullptr)
         {
-            std::unique_ptr<OutputStream> outStream (tempFile.getFile().createOutputStream());
-
-            if (outStream != nullptr)
+            if (auto outStream = tempFile.getFile().createOutputStream())
             {
                 std::unique_ptr<AudioFormatWriter> writer (wav.createWriterFor (outStream.get(), reader->sampleRate,
                                                                                 reader->numChannels, (int) reader->bitsPerSample,

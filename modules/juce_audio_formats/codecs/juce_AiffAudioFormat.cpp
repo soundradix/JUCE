@@ -274,9 +274,9 @@ namespace AiffFileHelpers
         static bool metaDataContainsZeroIdentifiers (const StringPairArray& values)
         {
             // (zero cue identifiers are valid for WAV but not for AIFF)
-            const String cueString ("Cue");
-            const String noteString ("CueNote");
-            const String identifierString ("Identifier");
+            const char* const cueString = "Cue";
+            const char* const noteString = "CueNote";
+            const char* const identifierString = "Identifier";
 
             for (auto& key : values.getAllKeys())
             {
@@ -294,55 +294,54 @@ namespace AiffFileHelpers
         static void create (MemoryBlock& block, const StringPairArray& values)
         {
             auto numCues = values.getValue ("NumCuePoints", "0").getIntValue();
+            if (numCues <= 0)
+                return;
 
-            if (numCues > 0)
+            MemoryOutputStream out (block, false);
+            out.writeShortBigEndian ((short) numCues);
+
+            auto numCueLabels = values.getValue ("NumCueLabels", "0").getIntValue();
+            auto idOffset = metaDataContainsZeroIdentifiers (values) ? 1 : 0; // can't have zero IDs in AIFF
+
+           #if JUCE_DEBUG
+            Array<int> identifiers;
+           #endif
+
+            for (int i = 0; i < numCues; ++i)
             {
-                MemoryOutputStream out (block, false);
-                out.writeShortBigEndian ((short) numCues);
-
-                auto numCueLabels = values.getValue ("NumCueLabels", "0").getIntValue();
-                auto idOffset = metaDataContainsZeroIdentifiers (values) ? 1 : 0; // can't have zero IDs in AIFF
+                auto prefixCue = "Cue" + String (i);
+                auto identifier = idOffset + values.getValue (prefixCue + "Identifier", "1").getIntValue();
 
                #if JUCE_DEBUG
-                Array<int> identifiers;
+                jassert (! identifiers.contains (identifier));
+                identifiers.add (identifier);
                #endif
 
-                for (int i = 0; i < numCues; ++i)
+                auto offset = values.getValue (prefixCue + "Offset", "0").getIntValue();
+                auto label = "CueLabel" + String (i);
+
+                for (int labelIndex = 0; labelIndex < numCueLabels; ++labelIndex)
                 {
-                    auto prefixCue = "Cue" + String (i);
-                    auto identifier = idOffset + values.getValue (prefixCue + "Identifier", "1").getIntValue();
+                    auto prefixLabel = "CueLabel" + String (labelIndex);
+                    auto labelIdentifier = idOffset + values.getValue (prefixLabel + "Identifier", "1").getIntValue();
 
-                   #if JUCE_DEBUG
-                    jassert (! identifiers.contains (identifier));
-                    identifiers.add (identifier);
-                   #endif
-
-                    auto offset = values.getValue (prefixCue + "Offset", "0").getIntValue();
-                    auto label = "CueLabel" + String (i);
-
-                    for (int labelIndex = 0; labelIndex < numCueLabels; ++labelIndex)
+                    if (labelIdentifier == identifier)
                     {
-                        auto prefixLabel = "CueLabel" + String (labelIndex);
-                        auto labelIdentifier = idOffset + values.getValue (prefixLabel + "Identifier", "1").getIntValue();
-
-                        if (labelIdentifier == identifier)
-                        {
-                            label = values.getValue (prefixLabel + "Text", label);
-                            break;
-                        }
+                        label = values.getValue (prefixLabel + "Text", label);
+                        break;
                     }
-
-                    out.writeShortBigEndian ((short) identifier);
-                    out.writeIntBigEndian (offset);
-
-                    auto labelLength = jmin ((size_t) 254, label.getNumBytesAsUTF8()); // seems to need null terminator even though it's a pstring
-                    out.writeByte (static_cast<char> (labelLength + 1));
-                    out.write (label.toUTF8(), labelLength);
-                    out.writeByte (0);
-
-                    if ((out.getDataSize() & 1) != 0)
-                        out.writeByte (0);
                 }
+
+                out.writeShortBigEndian ((short) identifier);
+                out.writeIntBigEndian (offset);
+
+                auto labelLength = jmin ((size_t) 254, label.getNumBytesAsUTF8()); // seems to need null terminator even though it's a pstring
+                out.writeByte (static_cast<char> (labelLength + 1));
+                out.write (label.toUTF8(), labelLength);
+                out.writeByte (0);
+
+                if ((out.getDataSize() & 1) != 0)
+                    out.writeByte (0);
             }
         }
     }
@@ -392,7 +391,7 @@ public:
 
         std::map<String, String> metadataValuesMap;
 
-        for (int i = 0; i != metadataValues.size(); ++i)
+        for (int i = 0; i < metadataValues.size(); ++i)
         {
             metadataValuesMap.emplace (metadataValues.getAllKeys().getReference (i),
                                        metadataValues.getAllValues().getReference (i));
@@ -435,10 +434,14 @@ public:
                         lengthInSamples = input->readIntBigEndian();
                         bitsPerSample = (unsigned int) input->readShortBigEndian();
                         bytesPerFrame = (int) ((numChannels * bitsPerSample) >> 3);
+                        littleEndian = false;
 
-                        unsigned char sampleRateBytes[10];
+                        if (bitsPerSample == 12)
+                            break; // Unsupported...
+
+                        uint8 sampleRateBytes[10];
                         input->read (sampleRateBytes, 10);
-                        const int byte0 = sampleRateBytes[0];
+                        const auto byte0 = (int) sampleRateBytes[0];
 
                         if ((byte0 & 0x80) != 0
                              || byte0 <= 0x3F || byte0 > 0x40
@@ -457,25 +460,42 @@ public:
                         }
                         else
                         {
-                            auto compType = input->readInt();
+                            const auto compType = input->readInt();
 
                             if (compType == chunkName ("NONE") || compType == chunkName ("twos"))
                             {
-                                littleEndian = false;
                             }
                             else if (compType == chunkName ("sowt"))
                             {
                                 littleEndian = true;
                             }
-                            else if (compType == chunkName ("fl32") || compType == chunkName ("FL32"))
+                            else if (compType == chunkName ("fl32") || compType == chunkName ("FL32")
+                                  || compType == chunkName ("fl64") || compType == chunkName ("FL64"))
                             {
-                                littleEndian = false;
                                 usesFloatingPointData = true;
+                            }
+                            else if (compType == chunkName ("alaw") || compType == chunkName ("ALAW"))
+                            {
+                                subformat = AudioSubformat::aLaw;
+                            }
+                            else if (compType == chunkName ("ulaw") || compType == chunkName ("ULAW"))
+                            {
+                                subformat = AudioSubformat::muLaw;
                             }
                             else
                             {
-                                sampleRate = 0;
+                                sampleRate = 0.0;
                                 break;
+                            }
+
+                            // Mu-Law and A-Law only support 8k sample rates.
+                            if (subformat == AudioSubformat::aLaw || subformat == AudioSubformat::muLaw)
+                            {
+                                if (! approximatelyEqual (sampleRate, 8000.0))
+                                {
+                                    sampleRate = 0.0;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -552,7 +572,7 @@ public:
                     else if (type == chunkName ("cate"))
                     {
                         metadataValuesMap.emplace (AiffAudioFormat::appleTag,
-                                                  AiffFileHelpers::CATEChunk::read (*input, length));
+                                                   AiffFileHelpers::CATEChunk::read (*input, length));
                     }
                     else if ((hasGotVer && hasGotData && hasGotType)
                               || chunkEnd < input->getPosition()
@@ -586,11 +606,11 @@ public:
 
         while (numSamples > 0)
         {
-            const int tempBufSize = 480 * 3 * 4; // (keep this a multiple of 3)
+            constexpr auto tempBufSize = 480 * 3 * 4; // (keep this a multiple of 3)
             char tempBuffer [tempBufSize];
 
-            const int numThisTime = jmin (tempBufSize / bytesPerFrame, numSamples);
-            const int bytesRead = input->read (tempBuffer, numThisTime * bytesPerFrame);
+            const auto numThisTime = jmin (tempBufSize / bytesPerFrame, numSamples);
+            const auto bytesRead = input->read (tempBuffer, numThisTime * bytesPerFrame);
 
             if (bytesRead < numThisTime * bytesPerFrame)
             {
@@ -599,11 +619,11 @@ public:
             }
 
             if (littleEndian)
-                copySampleData<AudioData::LittleEndian> (bitsPerSample, usesFloatingPointData,
+                copySampleData<AudioData::LittleEndian> (bitsPerSample, usesFloatingPointData, subformat,
                                                          destSamples, startOffsetInDestBuffer, numDestChannels,
                                                          tempBuffer, (int) numChannels, numThisTime);
             else
-                copySampleData<AudioData::BigEndian> (bitsPerSample, usesFloatingPointData,
+                copySampleData<AudioData::BigEndian> (bitsPerSample, usesFloatingPointData, subformat,
                                                       destSamples, startOffsetInDestBuffer, numDestChannels,
                                                       tempBuffer, (int) numChannels, numThisTime);
 
@@ -615,25 +635,39 @@ public:
     }
 
     template <typename Endianness>
-    static void copySampleData (unsigned int numBitsPerSample, bool floatingPointData,
+    static void copySampleData (unsigned int numBitsPerSample, bool floatingPointData, AudioSubformat subformat,
                                 int* const* destSamples, int startOffsetInDestBuffer, int numDestChannels,
                                 const void* sourceData, int numberOfChannels, int numSamples) noexcept
     {
         switch (numBitsPerSample)
         {
-            case 8:     ReadHelper<AudioData::Int32, AudioData::Int8,  Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+            case 8:
+                switch (subformat)
+                {
+                    case AudioSubformat::aLaw:   ReadHelper<AudioData::Int32, AudioData::UInt8ALaw,  Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                    case AudioSubformat::muLaw:  ReadHelper<AudioData::Int32, AudioData::UInt8MuLaw, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                    default:                    ReadHelper<AudioData::Int32, AudioData::Int8,       Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+                };
+            break;
+
+            case 12:    ReadHelper<AudioData::Int32, AudioData::Int12, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 16:    ReadHelper<AudioData::Int32, AudioData::Int16, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
+            case 20:    ReadHelper<AudioData::Int32, AudioData::Int20, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 24:    ReadHelper<AudioData::Int32, AudioData::Int24, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples); break;
             case 32:    if (floatingPointData) ReadHelper<AudioData::Float32, AudioData::Float32, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
                         else                   ReadHelper<AudioData::Int32,   AudioData::Int32,   Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
+                        break;
+            case 64:    if (floatingPointData) ReadHelper<AudioData::Float32, AudioData::Float64, Endianness>::read (destSamples, startOffsetInDestBuffer, numDestChannels, sourceData, numberOfChannels, numSamples);
+                        else jassertfalse;
                         break;
             default:    jassertfalse; break;
         }
     }
 
-    int bytesPerFrame;
-    int64 dataChunkStart;
-    bool littleEndian;
+    int bytesPerFrame = 0;
+    int64 dataChunkStart = 0;
+    bool littleEndian = false;
+    AudioSubformat subformat = AudioSubformat::regular;
 
 private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AiffAudioFormatReader)
@@ -762,7 +796,7 @@ private:
             }
             else
             {
-                int n = (int) sampleRate;
+                auto n = (int) sampleRate;
                 int i;
 
                 for (i = 0; i <= 32 ; ++i)
@@ -824,7 +858,8 @@ public:
     MemoryMappedAiffReader (const File& f, const AiffAudioFormatReader& reader)
         : MemoryMappedAudioFormatReader (f, reader, reader.dataChunkStart,
                                          reader.bytesPerFrame * reader.lengthInSamples, reader.bytesPerFrame),
-          littleEndian (reader.littleEndian)
+          littleEndian (reader.littleEndian),
+          subformat (reader.subformat)
     {
     }
 
@@ -845,11 +880,11 @@ public:
 
         if (littleEndian)
             AiffAudioFormatReader::copySampleData<AudioData::LittleEndian>
-                    (bitsPerSample, usesFloatingPointData, destSamples, startOffsetInDestBuffer,
+                    (bitsPerSample, usesFloatingPointData, subformat, destSamples, startOffsetInDestBuffer,
                      numDestChannels, sampleToPointer (startSampleInFile), (int) numChannels, numSamples);
         else
             AiffAudioFormatReader::copySampleData<AudioData::BigEndian>
-                    (bitsPerSample, usesFloatingPointData, destSamples, startOffsetInDestBuffer,
+                    (bitsPerSample, usesFloatingPointData, subformat, destSamples, startOffsetInDestBuffer,
                      numDestChannels, sampleToPointer (startSampleInFile), (int) numChannels, numSamples);
 
         return true;
@@ -867,18 +902,31 @@ public:
             return;
         }
 
-        float** dest = &result;
-        const void* source = sampleToPointer (sample);
+        auto** dest = &result;
+        const auto* source = sampleToPointer (sample);
 
         if (littleEndian)
         {
             switch (bitsPerSample)
             {
-                case 8:     ReadHelper<AudioData::Float32, AudioData::UInt8, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                case 8:
+                    switch (subformat)
+                    {
+                        case AudioSubformat::aLaw:   ReadHelper<AudioData::Float32, AudioData::UInt8ALaw,  AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                        case AudioSubformat::muLaw:  ReadHelper<AudioData::Float32, AudioData::UInt8MuLaw, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                        default:                    ReadHelper<AudioData::Float32, AudioData::UInt8,      AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                    };
+                break;
+
+                case 12:    ReadHelper<AudioData::Float32, AudioData::Int12, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 16:    ReadHelper<AudioData::Float32, AudioData::Int16, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
+                case 20:    ReadHelper<AudioData::Float32, AudioData::Int20, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 24:    ReadHelper<AudioData::Float32, AudioData::Int24, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 32:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float32, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
                             else                       ReadHelper<AudioData::Float32, AudioData::Int32,   AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
+                            break;
+                case 64:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float64, AudioData::LittleEndian>::read (dest, 0, 1, source, 1, num);
+                            else jassertfalse;
                             break;
                 default:    jassertfalse; break;
             }
@@ -887,11 +935,24 @@ public:
         {
             switch (bitsPerSample)
             {
-                case 8:     ReadHelper<AudioData::Float32, AudioData::UInt8, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
+                case 8:
+                    switch (subformat)
+                    {
+                        case AudioSubformat::aLaw:   ReadHelper<AudioData::Float32, AudioData::UInt8ALaw,  AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
+                        case AudioSubformat::muLaw:  ReadHelper<AudioData::Float32, AudioData::UInt8MuLaw, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
+                        default:                    ReadHelper<AudioData::Float32, AudioData::UInt8,      AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
+                    };
+                break;
+
+                case 12:    ReadHelper<AudioData::Float32, AudioData::Int12, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 16:    ReadHelper<AudioData::Float32, AudioData::Int16, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
+                case 20:    ReadHelper<AudioData::Float32, AudioData::Int20, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 24:    ReadHelper<AudioData::Float32, AudioData::Int24, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num); break;
                 case 32:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float32, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num);
                             else                       ReadHelper<AudioData::Float32, AudioData::Int32,   AudioData::BigEndian>::read (dest, 0, 1, source, 1, num);
+                            break;
+                case 64:    if (usesFloatingPointData) ReadHelper<AudioData::Float32, AudioData::Float64, AudioData::BigEndian>::read (dest, 0, 1, source, 1, num);
+                            else jassertfalse;
                             break;
                 default:    jassertfalse; break;
             }
@@ -907,18 +968,30 @@ public:
             jassert (numSamples <= 0); // you must make sure that the window contains all the samples you're going to attempt to read.
 
             for (int i = 0; i < numChannelsToRead; ++i)
-                results[i] = Range<float>();
+                results[i] = {};
 
             return;
         }
 
         switch (bitsPerSample)
         {
-            case 8:     scanMinAndMax<AudioData::UInt8> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+            case 8:
+                switch (subformat)
+                {
+                    case AudioSubformat::aLaw:   scanMinAndMax<AudioData::UInt8ALaw> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                    case AudioSubformat::muLaw:  scanMinAndMax<AudioData::UInt8MuLaw> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                    default:                    scanMinAndMax<AudioData::UInt8> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+                };
+            break;
+
+            case 12:    scanMinAndMax<AudioData::Int12> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 16:    scanMinAndMax<AudioData::Int16> (startSampleInFile, numSamples, results, numChannelsToRead); break;
+            case 20:    scanMinAndMax<AudioData::Int20> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 24:    scanMinAndMax<AudioData::Int24> (startSampleInFile, numSamples, results, numChannelsToRead); break;
             case 32:    if (usesFloatingPointData) scanMinAndMax<AudioData::Float32> (startSampleInFile, numSamples, results, numChannelsToRead);
                         else                       scanMinAndMax<AudioData::Int32>   (startSampleInFile, numSamples, results, numChannelsToRead);
+                        break;
+            case 64:    if (usesFloatingPointData) scanMinAndMax<AudioData::Float64> (startSampleInFile, numSamples, results, numChannelsToRead);
                         break;
             default:    jassertfalse; break;
         }
@@ -928,6 +1001,7 @@ public:
 
 private:
     const bool littleEndian;
+    const AudioSubformat subformat;
 
     template <typename SampleType>
     void scanMinAndMax (int64 startSampleInFile, int64 numSamples, Range<float>* results, int numChannelsToRead) const noexcept
@@ -947,21 +1021,18 @@ private:
 };
 
 //==============================================================================
-AiffAudioFormat::AiffAudioFormat()  : AudioFormat (aiffFormatName, ".aiff .aif") {}
+AiffAudioFormat::AiffAudioFormat()  : AudioFormat (aiffFormatName, ".iff .aiff .aif .aifc .snd") {}
 AiffAudioFormat::~AiffAudioFormat() {}
 
 Array<int> AiffAudioFormat::getPossibleSampleRates()
 {
-    return { 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000 };
+    return { 8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100,
+             48000, 88200, 96000, 176400, 192000, 352800, 384000 };
 }
 
-Array<int> AiffAudioFormat::getPossibleBitDepths()
-{
-     return { 8, 16, 24 };
-}
-
-bool AiffAudioFormat::canDoStereo() { return true; }
-bool AiffAudioFormat::canDoMono()   { return true; }
+Array<int> AiffAudioFormat::getPossibleBitDepths()  { return { 8, 12, 16, 20, 24, 32, 64 }; }
+bool AiffAudioFormat::canDoStereo()                 { return true; }
+bool AiffAudioFormat::canDoMono()                   { return true; }
 
 #if JUCE_MAC
 bool AiffAudioFormat::canHandleFile (const File& f)
@@ -979,13 +1050,20 @@ bool AiffAudioFormat::canHandleFile (const File& f)
 
 AudioFormatReader* AiffAudioFormat::createReaderFor (InputStream* sourceStream, bool deleteStreamIfOpeningFails)
 {
-    std::unique_ptr<AiffAudioFormatReader> w (new AiffAudioFormatReader (sourceStream));
+    auto r = std::make_unique<AiffAudioFormatReader> (sourceStream);
 
-    if (w->sampleRate > 0 && w->numChannels > 0)
-        return w.release();
+    bool ok = r->sampleRate > 0.0
+           && r->numChannels > 0
+           && getPossibleBitDepths().contains ((int) r->bitsPerSample);
+
+    if (ok && r->usesFloatingPointData)
+        ok = r->bitsPerSample == 32 || r->bitsPerSample == 64;
+
+    if (ok)
+        return r.release();
 
     if (! deleteStreamIfOpeningFails)
-        w->input = nullptr;
+        r->input = nullptr;
 
     return nullptr;
 }

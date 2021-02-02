@@ -94,6 +94,7 @@ namespace OggVorbisNamespace
 #endif
 }
 
+#undef inline
 #undef max
 #undef min
 
@@ -346,14 +347,14 @@ public:
         {
             if (numSamples > 0)
             {
-                const double gain = 1.0 / 0x80000000u;
-                float** const vorbisBuffer = vorbis_analysis_buffer (&vd, numSamples);
+                const auto gain = 1.0 / 0x80000000u;
+                auto** const vorbisBuffer = vorbis_analysis_buffer (&vd, numSamples);
 
                 for (int i = (int) numChannels; --i >= 0;)
                 {
                     if (auto* dst = vorbisBuffer[i])
                     {
-                        if (const int* src = samplesToWrite [i])
+                        if (const auto* src = samplesToWrite [i])
                         {
                             for (int j = 0; j < numSamples; ++j)
                                 dst[j] = (float) (src[j] * gain);
@@ -418,7 +419,6 @@ private:
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OggWriter)
 };
 
-
 //==============================================================================
 OggVorbisAudioFormat::OggVorbisAudioFormat()  : AudioFormat (oggFormatName, ".ogg")
 {
@@ -430,13 +430,14 @@ OggVorbisAudioFormat::~OggVorbisAudioFormat()
 
 Array<int> OggVorbisAudioFormat::getPossibleSampleRates()
 {
-    return { 8000, 11025, 12000, 16000, 22050, 32000,
-             44100, 48000, 88200, 96000, 176400, 192000 };
+    return { 8000, 10000, 11025, 12000, 14000, 16000, 18000,
+             20000, 22050, 24000, 28000, 32000, 36000, 44100,
+             48000, 56000, 64000, 88200, 96000, 176400, 192000 };
 }
 
 Array<int> OggVorbisAudioFormat::getPossibleBitDepths()
 {
-    return { 32 };
+    return { 16, 24 };
 }
 
 bool OggVorbisAudioFormat::canDoStereo()    { return true; }
@@ -445,7 +446,7 @@ bool OggVorbisAudioFormat::isCompressed()   { return true; }
 
 AudioFormatReader* OggVorbisAudioFormat::createReaderFor (InputStream* in, bool deleteStreamIfOpeningFails)
 {
-    std::unique_ptr<OggReader> r (new OggReader (in));
+    auto r = std::make_unique<OggReader> (in);
 
     if (r->sampleRate > 0)
         return r.release();
@@ -466,10 +467,9 @@ AudioFormatWriter* OggVorbisAudioFormat::createWriterFor (OutputStream* out,
     if (out == nullptr)
         return nullptr;
 
-    std::unique_ptr<OggWriter> w (new OggWriter (out, sampleRate, numChannels,
-                                                 (unsigned int) bitsPerSample,
-                                                 qualityOptionIndex, metadataValues));
-
+    auto w = std::make_unique<OggWriter> (out, sampleRate, numChannels,
+                                          (unsigned int) bitsPerSample,
+                                          qualityOptionIndex, metadataValues);
     return w->ok ? w.release() : nullptr;
 }
 

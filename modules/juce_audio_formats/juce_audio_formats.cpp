@@ -52,6 +52,24 @@
 #endif
 
 //==============================================================================
+#if ! DOXYGEN
+
+namespace juce
+{
+    enum class AudioSubformat
+    {
+        regular,
+        adpcm,
+        aLaw,
+        muLaw,
+        gsm610,
+        oggVorbis,
+        flac
+    };
+}
+
+#endif
+
 #include "format/juce_AudioFormat.cpp"
 #include "format/juce_AudioFormatManager.cpp"
 #include "format/juce_AudioFormatReader.cpp"

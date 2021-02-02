@@ -183,6 +183,7 @@ namespace FlacNamespace
 #endif
 }
 
+#undef inline
 #undef max
 #undef min
 
@@ -565,13 +566,13 @@ FlacAudioFormat::~FlacAudioFormat() {}
 
 Array<int> FlacAudioFormat::getPossibleSampleRates()
 {
-    return { 8000, 11025, 12000, 16000, 22050, 32000, 44100, 48000,
-             88200, 96000, 176400, 192000, 352800, 384000 };
+    return { 8000, 16000, 22050, 24000, 32000, 44100,
+             48000, 88200, 96000, 176400, 192000 };
 }
 
 Array<int> FlacAudioFormat::getPossibleBitDepths()
 {
-    return { 16, 24 };
+    return { 8, 12, 16, 20, 24, 32 };
 }
 
 bool FlacAudioFormat::canDoStereo()     { return true; }
