@@ -38,7 +38,7 @@ struct FFT::Instance
 
 struct FFT::Engine
 {
-    Engine (int priorityToUse) : enginePriority (priorityToUse)
+    Engine (int priorityToUse, const String& name) : engineName (name), enginePriority (priorityToUse)
     {
         auto& list = getEngines();
         list.add (this);
@@ -60,21 +60,32 @@ struct FFT::Engine
         return nullptr;
     }
 
-private:
+    static FFT::Instance* createRequestedEngine (int order, const String& name)
+    {
+        for (auto* engine : getEngines())
+            if (engine->engineName == name)
+                return engine->create (order);
+
+        return nullptr;
+    }
+
     static Array<Engine*>& getEngines()
     {
         static Array<Engine*> engines;
         return engines;
     }
 
+    String engineName;
+
+private:
     int enginePriority; // used so that faster engines have priority over slower ones
 };
 
 template <typename InstanceToUse>
 struct FFT::EngineImpl  : public FFT::Engine
 {
-    EngineImpl() : FFT::Engine (InstanceToUse::priority)        {}
-    FFT::Instance* create (int order) const override            { return InstanceToUse::create (order); }
+    EngineImpl() : FFT::Engine (InstanceToUse::priority, InstanceToUse::name) {}
+    FFT::Instance* create (int order) const override { return InstanceToUse::create (order); }
 };
 
 //==============================================================================
@@ -83,6 +94,7 @@ struct FFTFallback  : public FFT::Instance
 {
     // this should have the least priority of all engines
     static constexpr int priority = -1;
+    static constexpr const char* name = "JUCE_Fallback_FFT";
 
     static FFTFallback* create (int order)
     {
@@ -437,6 +449,7 @@ FFT::EngineImpl<FFTFallback> fftFallback;
 struct AppleFFT  : public FFT::Instance
 {
     static constexpr int priority = 5;
+    static constexpr const char* name = "Apple_vDSP";
 
     static AppleFFT* create (int order)
     {
@@ -564,6 +577,7 @@ struct FFTWImpl  : public FFT::Instance
    #else
     static constexpr int priority = 3;
    #endif
+    static constexpr const char* name = "FFTW";
 
     struct FFTWPlan;
     using FFTWPlanRef = FFTWPlan*;
@@ -595,9 +609,9 @@ struct FFTWImpl  : public FFT::Instance
         }
        #else
         template <typename FuncPtr>
-        static bool symbol (DynamicLibrary& lib, FuncPtr& dst, const char* name)
+        static bool symbol (DynamicLibrary& lib, FuncPtr& dst, const char* n)
         {
-            dst = reinterpret_cast<FuncPtr> (lib.getFunction (name));
+            dst = reinterpret_cast<FuncPtr> (lib.getFunction (n));
             return (dst != nullptr);
         }
        #endif
@@ -736,6 +750,7 @@ FFT::EngineImpl<FFTWImpl> fftwEngine;
 struct IntelFFT  : public FFT::Instance
 {
     static constexpr int priority = 8;
+    static constexpr const char* name = "INTEL_MKL";
 
     static bool succeeded (MKL_LONG status) noexcept        { return status == 0; }
 
@@ -818,6 +833,7 @@ class IntelPerformancePrimitivesFFT : public FFT::Instance
 {
 public:
     static constexpr auto priority = 9;
+    static constexpr const char* name = "INTEL_IPP";
 
     static IntelPerformancePrimitivesFFT* create (const int order)
     {
@@ -949,8 +965,8 @@ FFT::EngineImpl<IntelPerformancePrimitivesFFT> intelPerformancePrimitivesFFT;
 
 //==============================================================================
 //==============================================================================
-FFT::FFT (int order)
-    : engine (FFT::Engine::createBestEngineForPlatform (order)),
+FFT::FFT (int order, const String& name)
+    : engine (name.isEmpty() ? FFT::Engine::createBestEngineForPlatform (order) : FFT::Engine::createRequestedEngine (order, name)),
       size (1 << order)
 {
 }
@@ -991,6 +1007,19 @@ void FFT::performFrequencyOnlyForwardTransform (float* inputOutputData) const no
         inputOutputData[i] = std::abs (out[i]);
 
     zeromem (&inputOutputData[size], static_cast<size_t> (size) * sizeof (float));
+}
+
+StringArray FFT::getEngines()
+{
+    StringArray result;
+    for (auto* x : FFT::Engine::getEngines())
+        result.add (x->engineName);
+    return result;
+}
+
+String FFT::getDefaultEngine()
+{
+    return FFT::Engine::getEngines()[0]->engineName;
 }
 
 } // namespace dsp

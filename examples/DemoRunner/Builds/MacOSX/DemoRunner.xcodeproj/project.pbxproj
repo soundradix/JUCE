@@ -534,6 +534,9 @@
 					"JUCE_STANDALONE_APPLICATION=1",
 					"JUCE_DEMO_RUNNER=1",
 					"JUCE_UNIT_TESTS=1",
+					"JUCE_IPP_AVAILABLE=JUCE_INTEL",
+					"JUCE_DSP_USE_INTEL_MKL=JUCE_INTEL",
+					"JUCE_DSP_USE_SHARED_FFTW=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
 					"JUCE_APP_VERSION=6.0.8",
 					"JUCE_APP_VERSION_HEX=0x60008",
@@ -550,6 +553,8 @@
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../../JuceLibraryCode",
 					"$(SRCROOT)/../../../../modules",
+					"/opt/intel/oneapi/ipp/latest/include",
+					"/opt/intel/oneapi/mkl/latest/include",
 					"$(inherited)",
 				);
 				INFOPLIST_FILE = Info-App.plist;
@@ -557,8 +562,9 @@
 				INSTALL_PATH = "$(HOME)/Applications";
 				LLVM_LTO = YES;
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../../modules";
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../../modules /opt/intel/oneapi/ipp/latest/include /opt/intel/oneapi/mkl/latest/include";
 				OTHER_CPLUSPLUSFLAGS = "-Wall -Wshadow-all -Wshorten-64-to-32 -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wint-conversion -Wconditional-uninitialized -Woverloaded-virtual -Wreorder -Wconstant-conversion -Wsign-conversion -Wunused-private-field -Wbool-conversion -Wextra-semi -Wunreachable-code -Wzero-as-null-pointer-constant -Wcast-align -Winconsistent-missing-destructor-override -Wshift-sign-overflow -Wnullable-to-nonnull-conversion -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wswitch-enum";
+				OTHER_LDFLAGS = "-Wl,/opt/intel/oneapi/ipp/latest/lib/libipps.a,/opt/intel/oneapi/ipp/latest/lib/libippcore.a,/opt/intel/oneapi/ipp/latest/lib/libippvm.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_sequential.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_intel_lp64.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_core.a -Xlinker -headerpad -Xlinker 800";
 				PRODUCT_BUNDLE_IDENTIFIER = com.rmsl.jucedemorunner;
 				PRODUCT_NAME = "DemoRunner";
 				USE_HEADERMAP = NO;
@@ -612,6 +618,9 @@
 					"JUCE_STANDALONE_APPLICATION=1",
 					"JUCE_DEMO_RUNNER=1",
 					"JUCE_UNIT_TESTS=1",
+					"JUCE_IPP_AVAILABLE=JUCE_INTEL",
+					"JUCE_DSP_USE_INTEL_MKL=JUCE_INTEL",
+					"JUCE_DSP_USE_SHARED_FFTW=1",
 					"JUCER_XCODE_MAC_F6D2F4CF=1",
 					"JUCE_APP_VERSION=6.0.8",
 					"JUCE_APP_VERSION_HEX=0x60008",
@@ -628,14 +637,17 @@
 				HEADER_SEARCH_PATHS = (
 					"$(SRCROOT)/../../JuceLibraryCode",
 					"$(SRCROOT)/../../../../modules",
+					"/opt/intel/oneapi/ipp/latest/include",
+					"/opt/intel/oneapi/mkl/latest/include",
 					"$(inherited)",
 				);
 				INFOPLIST_FILE = Info-App.plist;
 				INFOPLIST_PREPROCESS = NO;
 				INSTALL_PATH = "$(HOME)/Applications";
 				MACOSX_DEPLOYMENT_TARGET = 10.11;
-				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../../modules";
+				MTL_HEADER_SEARCH_PATHS = "$(SRCROOT)/../../JuceLibraryCode $(SRCROOT)/../../../../modules /opt/intel/oneapi/ipp/latest/include /opt/intel/oneapi/mkl/latest/include";
 				OTHER_CPLUSPLUSFLAGS = "-Wall -Wshadow-all -Wshorten-64-to-32 -Wstrict-aliasing -Wuninitialized -Wunused-parameter -Wconversion -Wsign-compare -Wint-conversion -Wconditional-uninitialized -Woverloaded-virtual -Wreorder -Wconstant-conversion -Wsign-conversion -Wunused-private-field -Wbool-conversion -Wextra-semi -Wunreachable-code -Wzero-as-null-pointer-constant -Wcast-align -Winconsistent-missing-destructor-override -Wshift-sign-overflow -Wnullable-to-nonnull-conversion -Wno-missing-field-initializers -Wno-ignored-qualifiers -Wswitch-enum";
+				OTHER_LDFLAGS = "-Wl,/opt/intel/oneapi/ipp/latest/lib/libipps.a,/opt/intel/oneapi/ipp/latest/lib/libippcore.a,/opt/intel/oneapi/ipp/latest/lib/libippvm.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_sequential.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_intel_lp64.a,/opt/intel/oneapi/mkl/latest/lib/libmkl_core.a -Xlinker -headerpad -Xlinker 800";
 				PRODUCT_BUNDLE_IDENTIFIER = com.rmsl.jucedemorunner;
 				PRODUCT_NAME = "DemoRunner";
 				USE_HEADERMAP = NO;

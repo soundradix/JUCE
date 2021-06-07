@@ -58,9 +58,29 @@ public:
          #ifdef JUCE_DEMO_RUNNER
           AudioAppComponent (getSharedAudioDeviceManager (1, 0)),
          #endif
-          forwardFFT (fftOrder),
+          forwardFFT (std::make_unique<dsp::FFT> (fftOrder)),
           spectrogramImage (Image::RGB, 512, 512, true)
     {
+        engine.setBounds (0, 0, 120, 50);
+        {
+            auto def = dsp::FFT::getDefaultEngine();
+            for (const auto& x : dsp::FFT::getEngines())
+            {
+                const int curId = engine.getNumItems() + 1;
+                engine.addItem (x, curId);
+                if (x == def)
+                    engine.setSelectedId (curId);
+            }
+        }
+        engine.onChange = [=]() {
+            measurements.clear();
+            forwardFFT = std::make_unique<dsp::FFT> (fftOrder, engine.getText());
+        };
+        addAndMakeVisible (engine);
+
+        benchResult.setBounds (engine.getBounds().withX (engine.getRight() + 5));
+        addAndMakeVisible (benchResult);
+
         setOpaque (true);
 
        #ifndef JUCE_DEMO_RUNNER
@@ -154,7 +174,16 @@ public:
         spectrogramImage.moveImageSection (0, 0, 1, 0, rightHandEdge, imageHeight);
 
         // then render our FFT data..
-        forwardFFT.performFrequencyOnlyForwardTransform (fftData);
+        {
+            const auto start = Time::getHighResolutionTicks();
+            forwardFFT->performFrequencyOnlyForwardTransform (fftData);
+            const double measure = Time::highResolutionTicksToSeconds (Time::getHighResolutionTicks() - start);
+            if (measurements.size() >= 100)
+                measurements.pop_front();
+            measurements.push_back (measure);
+            const double avg = std::accumulate (measurements.begin(), measurements.end(), 0.0) / (double) measurements.size();
+            benchResult.setText (String (roundToInt (avg * 1e6)) + " microsecs", dontSendNotification);
+        }
 
         // find the range of values produced, so we can scale our rendering to
         // show up the detail clearly
@@ -177,11 +206,15 @@ public:
     };
 
 private:
-    dsp::FFT forwardFFT;
+    std::unique_ptr<dsp::FFT> forwardFFT;
     Image spectrogramImage;
+    ComboBox engine;
+    Label benchResult;
+    std::deque<double> measurements;
 
     float fifo [fftSize];
     float fftData [2 * fftSize];
+    float fftDataTmp [2 * fftSize];
     int fifoIndex = 0;
     bool nextFFTBlockReady = false;
 
