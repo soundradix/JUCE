@@ -772,7 +772,7 @@ struct IntelFFT  : public FFT::Instance
         : order (orderToUse), c2c (c2cToUse), c2r (cr2ToUse)
     {}
 
-    ~IntelFFT()
+    ~IntelFFT() override
     {
         DftiFreeDescriptor (&c2c);
         DftiFreeDescriptor (&c2r);
@@ -810,15 +810,10 @@ struct IntelFFT  : public FFT::Instance
     DFTI_DESCRIPTOR_HANDLE c2c, c2r;
 };
 
-FFT::EngineImpl<IntelFFT> fftwEngine;
+FFT::EngineImpl<IntelFFT> intelMklFftEngine;
 #endif
 
-//==============================================================================
-//==============================================================================
-// Visual Studio should define no more than one of these, depending on the
-// setting at 'Project' > 'Properties' > 'Configuration Properties' > 'Intel
-// Performance Libraries' > 'Use Intel(R) IPP'
-#if _IPP_SEQUENTIAL_STATIC || _IPP_SEQUENTIAL_DYNAMIC || _IPP_PARALLEL_STATIC || _IPP_PARALLEL_DYNAMIC
+#if JUCE_IPP_AVAILABLE
 class IntelPerformancePrimitivesFFT : public FFT::Instance
 {
 public:
