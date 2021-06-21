@@ -54,13 +54,42 @@ bool WaitableEvent::wait (int timeOutMilliseconds) const
     return true;
 }
 
+#if JUCE_UNIT_TESTS
+struct WaitableEventTest  : public UnitTest
+{
+    WaitableEventTest() : UnitTest ("WaitableEvent", UnitTestCategories::threads) {}
+
+    void runTest() override
+    {
+        beginTest ("WaitableEvent test");
+
+        slowdown = true;
+        for (int i = 0; i < 10; ++i)
+        {
+            WaitableEvent e;
+            std::thread ([&e]() { e.signal(); }).detach();
+            Thread::sleep (100);
+            e.wait();
+        }
+        slowdown = false;
+    }
+
+    std::atomic<bool> slowdown {false};
+};
+
+static WaitableEventTest waitableEventTests;
+#endif
+
 void WaitableEvent::signal() const
 {
     {
         std::lock_guard<std::mutex> lock (mutex);
         triggered = true;
     }
-
+#if JUCE_UNIT_TESTS
+    if (waitableEventTests.slowdown)
+        Thread::sleep (200);
+#endif
     condition.notify_all();
 }
 
