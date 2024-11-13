@@ -1,3 +1,8 @@
+# Notable Changes
+- this requires following the ARA_SDK main branch (JUCE requires ARA version 2.2.0)
+
+---
+
 ![alt text](https://assets.juce.com/juce/JUCE_banner_github.png "JUCE")
 
 JUCE is an open-source cross-platform C++ application framework for creating high quality
