@@ -1,7 +1,34 @@
 # JUCE breaking changes
 
-# Version 8.0.4
+# develop
 
+## Change
+
+The signatures of virtual functions ImagePixelData::applyGaussianBlurEffect()
+and ImagePixelData::applySingleChannelBoxBlurEffect() have changed.
+ImageEffects::applyGaussianBlurEffect() and
+ImageEffects::applySingleChannelBoxBlurEffect() have been removed.
+
+**Possible Issues**
+
+User code overriding or calling these functions will fail to compile.
+
+**Workaround**
+
+The blur functions now operate within a specified area of the image. Update
+overriding implementations accordingly. Instead of using the ImageEffects
+static functions, call the corresponding ImagePixelData member functions
+directly.
+
+**Rationale**
+
+The blur functions had a 'temporary storage' parameter which was not
+particularly useful in practice, so this has been removed. Moving the
+functionality of the ImageEffects static members directly into corresponding
+member functions of ImagePixelData simplifies the public API.
+
+
+# Version 8.0.5
 
 ## Change
 
@@ -86,6 +113,8 @@ Select Arm64 or Arm64EC instead of Arm32, and port any 32-bit specific code to
 
 32-bit Arm support has been deprecated in current versions of Windows 11.
 
+
+# Version 8.0.4
 
 ## Change
 

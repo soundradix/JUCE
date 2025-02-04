@@ -52,7 +52,7 @@
 //==============================================================================
 #if JUCE_MAC
  #import <QuartzCore/QuartzCore.h>
- #include <CoreImage/CIRenderDestination.h>
+ #include <CoreImage/CoreImage.h>
  #include <CoreText/CTFont.h>
 
 #elif JUCE_WINDOWS
@@ -94,6 +94,8 @@
   #pragma comment(lib, "DComp.lib")
   #pragma comment(lib, "dxguid.lib")
  #endif
+
+ #include "native/juce_Direct2DPixelDataPage_windows.h"
 
 #elif JUCE_IOS
  #import <QuartzCore/QuartzCore.h>

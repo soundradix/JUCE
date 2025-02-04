@@ -35,19 +35,6 @@
 namespace juce
 {
 
-/*  A single bitmap that represents a subsection of a virtual bitmap. */
-struct Direct2DPixelDataPage
-{
-    /*  The bounds of the stored bitmap inside the virtual bitmap. */
-    Rectangle<int> getBounds() const;
-
-    /*  The stored subsection bitmap. */
-    ComSmartPtr<ID2D1Bitmap1> bitmap;
-
-    /*  The top-left position of this virtual bitmap inside the virtual bitmap. */
-    Point<int> topLeft;
-};
-
 /*  A set of pages that together represent a full virtual bitmap.
     All pages in the set always share the same resource context.
     Additionally, stores a reference to a software-backed bitmap, the content of which will
@@ -69,7 +56,7 @@ public:
     /*  Creates a single page containing the provided bitmap and main-memory storage, marking the
         hardware data as up-to-date.
     */
-    Direct2DPixelDataPages (ComSmartPtr<ID2D1Bitmap1>, ImagePixelData::Ptr);
+    Direct2DPixelDataPages (ImagePixelDataBackupExtensions*, ComSmartPtr<ID2D1Bitmap1>, ImagePixelData::Ptr);
 
     /*  Allocates hardware storage for the provided software bitmap.
         Depending on the initial state, will:
@@ -77,7 +64,7 @@ public:
         - mark the GPU images as up-to-date, or
         - clear the GPU images, then mark them as up-to-date
     */
-    Direct2DPixelDataPages (ComSmartPtr<ID2D1Device1>, ImagePixelData::Ptr, State);
+    Direct2DPixelDataPages (ImagePixelDataBackupExtensions*, ComSmartPtr<ID2D1Device1>, ImagePixelData::Ptr, State);
 
     /*  Returns all pages included in this set.
         This will be called before reading from the pages (e.g. when drawing them).
@@ -85,6 +72,9 @@ public:
         copy from the software image if necessary before returning.
     */
     Span<const Page> getPages();
+
+    /** Returns all pages without first syncing from main memory. */
+    Span<const Page> getPagesWithoutSync() const;
 
     /*  Marks this set as needing to be updated from the software image.
         We don't actually do the copy until the next time that we need to read the hardware pages.
@@ -96,7 +86,13 @@ public:
         upToDate = false;
     }
 
+    bool isUpToDate() const
+    {
+        return upToDate;
+    }
+
 private:
+    ImagePixelDataBackupExtensions* parentBackupExtensions = nullptr;
     ImagePixelData::Ptr backingData;
     std::vector<Direct2DPixelDataPage> pages;
     bool upToDate = false;
@@ -121,7 +117,8 @@ private:
     render target are marked as outdated.
 */
 class Direct2DPixelData : public ImagePixelData,
-                          private DxgiAdapterListener
+                          private DxgiAdapterListener,
+                          private ImagePixelDataBackupExtensions
 {
 public:
     using Ptr = ReferenceCountedObjectPtr<Direct2DPixelData>;
@@ -170,8 +167,10 @@ public:
     */
     void initialiseBitmapData (Image::BitmapData&, int, int, Image::BitmapData::ReadWriteMode) override;
 
-    void applyGaussianBlurEffect (float radius, Image& result) override;
-    void applySingleChannelBoxBlurEffect (int radius, Image& result) override;
+    void applyGaussianBlurEffectInArea (Rectangle<int>, float) override;
+    void applySingleChannelBoxBlurEffectInArea (Rectangle<int>, int) override;
+    void multiplyAllAlphasInArea (Rectangle<int>, float) override;
+    void desaturateInArea (Rectangle<int>) override;
 
     /*  This returns image data that is suitable for use when drawing with the provided context.
         This image data should be treated as a read-only view - making modifications directly
@@ -189,6 +188,11 @@ public:
         return ! pages.empty() ? pages.front().bitmap : nullptr;
     }
 
+    BackupExtensions* getBackupExtensions() override { return this; }
+    const BackupExtensions* getBackupExtensions() const override { return this; }
+
+    ImagePixelDataNativeExtensions getNativeExtensions() override;
+
 private:
     enum class State
     {
@@ -196,22 +200,58 @@ private:
         initiallyCleared,
         drawing,
         drawn,
+        outdated,
     };
 
     Direct2DPixelData (ImagePixelData::Ptr, State);
     auto getIteratorForDevice (ComSmartPtr<ID2D1Device1>);
+
+    /*  Attempts to copy the content of the corresponding texture in graphics storage into
+        persistent software storage.
+        The argument specifies the device holding the texture that should be backed up.
+        Passing null will instead search through all devices to find which device has the most
+        recent copy of the image data.
+
+        In most cases it is unnecessary to call this function directly.
+
+        Returns true on success, i.e. the backup is already up-to-date or the backup was updated
+        successfully.
+
+        Returns false on failure. The backup process may fail if the graphics storage became
+        unavailable for some reason, such as an external GPU being disconnected, or a remote desktop
+        session ending. If this happens, the image content is *irrevocably lost* and will need to
+        be recreated.
+    */
+    bool createPersistentBackup (ComSmartPtr<ID2D1Device1> deviceHint);
+
+    struct Context;
+    std::unique_ptr<Context> createNativeContext();
+
+    template <typename Fn>
+    bool applyEffectInArea (Rectangle<int>, Fn&&);
+
+    void setBackupEnabled (bool) override;
+    bool isBackupEnabled() const override;
+    bool backupNow() override;
+    bool needsBackup() const override;
+    bool canBackup() const override;
 
     void adapterCreated (DxgiAdapter::Ptr) override {}
     void adapterRemoved (DxgiAdapter::Ptr adapter) override
     {
         if (adapter != nullptr)
             pagesForDevice.erase (adapter->direct2DDevice);
+
+        if (mostRecentDevice == adapter->direct2DDevice)
+            mostRecentDevice = nullptr;
     }
 
     SharedResourcePointer<DirectX> directX;
     ImagePixelData::Ptr backingData;
+    ComSmartPtr<ID2D1Device1> mostRecentDevice;
     std::map<ComSmartPtr<ID2D1Device1>, Pages> pagesForDevice;
     State state;
+    bool sync = true;
 
     JUCE_LEAK_DETECTOR (Direct2DPixelData)
 };

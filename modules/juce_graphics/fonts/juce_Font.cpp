@@ -105,6 +105,15 @@ public:
 
         const ScopedWriteLock slw (lock);
 
+        auto newFace = CachedFace { key,
+                                    ++counter,
+                                    juce_getTypefaceForFont != nullptr
+                                        ? juce_getTypefaceForFont (font)
+                                        : Font::getDefaultTypefaceForFont (font) };
+
+        if (newFace.typeface == nullptr)
+            return nullptr;
+
         const auto replaceIter = std::min_element (faces.begin(),
                                                    faces.end(),
                                                    [] (const auto& a, const auto& b)
@@ -114,13 +123,8 @@ public:
 
         jassert (replaceIter != faces.end());
         auto& face = *replaceIter;
-        face = CachedFace { key,
-                            ++counter,
-                            juce_getTypefaceForFont != nullptr
-                                ? juce_getTypefaceForFont (font)
-                                : Font::getDefaultTypefaceForFont (font) };
 
-        jassert (face.typeface != nullptr); // the look and feel must return a typeface!
+        face = std::move (newFace);
 
         if (defaultFace == nullptr && key == Key{})
             defaultFace = face.typeface;
@@ -206,10 +210,7 @@ public:
         const ScopedLock lock (mutex);
 
         if (typeface == nullptr)
-        {
             typeface = options.getTypeface() != nullptr ? options.getTypeface() : TypefaceCache::getInstance()->findTypefaceFor (f);
-            jassert (typeface != nullptr);
-        }
 
         return typeface;
     }
@@ -219,17 +220,24 @@ public:
         const ScopedLock lock (mutex);
 
         if (auto ptr = getTypefacePtr (f))
-            return ptr->getNativeDetails().getFontAtSizeAndScale (f.getMetricsKind(), f.getHeight(), f.getHorizontalScale());
+            return ptr->getNativeDetails().getFontAtPointSizeAndScale (f.getHeightInPoints(), f.getHorizontalScale());
 
         return {};
     }
 
-    TypefaceMetrics getMetrics (const Font& f)
+    TypefaceAscentDescent getAscentDescent (const Font& f)
     {
         const ScopedLock lock (mutex);
 
         if (auto ptr = getTypefacePtr (f))
-            return ptr->getMetrics (f.getMetricsKind());
+        {
+            const auto ascentDescent = ptr->getNativeDetails().getAscentDescent (f.getMetricsKind());
+
+            auto adjusted = ascentDescent;
+            adjusted.ascent = getAscentOverride().value_or (adjusted.ascent);
+            adjusted.descent = getDescentOverride().value_or (adjusted.descent);
+            return adjusted;
+        }
 
         return {};
     }
@@ -260,6 +268,9 @@ public:
     bool getUnderline() const                  { return options.getUnderline(); }
     bool getFallbackEnabled() const            { return options.getFallbackEnabled(); }
     TypefaceMetricsKind getMetricsKind() const { return options.getMetricsKind(); }
+
+    std::optional<float> getAscentOverride() const  { return options.getAscentOverride(); }
+    std::optional<float> getDescentOverride() const { return options.getDescentOverride(); }
 
     /*  This shared state may be shared between two or more Font instances that are being
         read/modified from multiple threads.
@@ -313,6 +324,18 @@ public:
     {
         jassert (getReferenceCount() == 1);
         options = options.withKerningFactor (x);
+    }
+
+    void setAscentOverride (std::optional<float> x)
+    {
+        jassert (getReferenceCount() == 1);
+        options = options.withAscentOverride (x);
+    }
+
+    void setDescentOverride (std::optional<float> x)
+    {
+        jassert (getReferenceCount() == 1);
+        options = options.withDescentOverride (x);
     }
 
     void setUnderline (bool x)
@@ -543,7 +566,7 @@ Font Font::withHeight (const float newHeight) const
 
 float Font::getHeightToPointsFactor() const
 {
-    return getTypefacePtr()->getMetrics (getMetricsKind()).heightToPoints;
+    return font->getAscentDescent (*this).getHeightToPointsFactor();
 }
 
 Font Font::withPointHeight (float heightInPoints) const
@@ -698,6 +721,26 @@ void Font::setExtraKerningFactor (const float extraKerning)
     font->resetTypeface();
 }
 
+std::optional<float> Font::getAscentOverride() const noexcept
+{
+    return font->getAscentOverride();
+}
+
+void Font::setAscentOverride (std::optional<float> x)
+{
+    font->setAscentOverride (x);
+}
+
+std::optional<float> Font::getDescentOverride() const noexcept
+{
+    return font->getDescentOverride();
+}
+
+void Font::setDescentOverride (std::optional<float> x)
+{
+    font->setDescentOverride (x);
+}
+
 Font Font::boldened() const                 { return withStyle (getStyleFlags() | bold); }
 Font Font::italicised() const               { return withStyle (getStyleFlags() | italic); }
 
@@ -730,14 +773,14 @@ void Font::setUnderline (const bool shouldBeUnderlined)
 
 float Font::getAscent() const
 {
-    return font->getMetrics (*this).ascent * getHeight();
+    return font->getAscentDescent (*this).getScaledAscent() * getHeight();
 }
 
 float Font::getHeight() const noexcept
 {
     jassert ((font->getHeight() > 0.0f) != (font->getPointHeight() > 0.0f));
     const auto height = font->getHeight();
-    return height > 0.0f ? height : font->getPointHeight() / getHeightToPointsFactor();
+    return height > 0.0f ? height : font->getPointHeight() * font->getAscentDescent (*this).getPointsToHeightFactor();
 }
 
 float Font::getDescent() const              { return getHeight() - getAscent(); }
@@ -746,7 +789,17 @@ float Font::getHeightInPoints() const
 {
     jassert ((font->getHeight() > 0.0f) != (font->getPointHeight() > 0.0f));
     const auto pointHeight = font->getPointHeight();
-    return pointHeight > 0.0f ? pointHeight : font->getHeight() * getHeightToPointsFactor();
+
+    if (pointHeight > 0.0f)
+        return pointHeight;
+
+    const auto factor = font->getAscentDescent (*this).getPointsToHeightFactor();
+
+    if (factor > 0.0f)
+        return font->getHeight() / factor;
+
+    jassertfalse;
+    return 0.0f;
 }
 
 float Font::getAscentInPoints() const       { return getAscent()  * getHeightToPointsFactor(); }
@@ -835,9 +888,19 @@ Font Font::findSuitableFontForText (const String& text, const String& language) 
             return copy;
     }
 
-    if (auto current = getTypefacePtr())
+    const auto fallbackTypefacePtr = std::invoke ([&]
     {
-        if (auto suggested = current->createSystemFallback (text, language))
+        if (auto current = getTypefacePtr())
+            return current;
+
+        auto copy = *this;
+        copy.setTypefaceName (Font::getDefaultSansSerifFontName());
+        return copy.getTypefacePtr();
+    });
+
+    if (fallbackTypefacePtr != nullptr)
+    {
+        if (auto suggested = fallbackTypefacePtr->createSystemFallback (text, language))
         {
             auto copy = *this;
 

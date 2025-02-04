@@ -32,45 +32,27 @@
   ==============================================================================
 */
 
+namespace juce
+{
 
-/*******************************************************************************
- The block below describes the properties of this module, and is read by
- the Projucer to automatically generate project code that uses it.
- For details about the syntax and how to create or use a module, see the
- JUCE Module Format.md file.
+/*  A single bitmap that represents a subsection of a virtual bitmap. */
+struct Direct2DPixelDataPage
+{
+    /*  The bounds of the stored bitmap inside the virtual bitmap. */
+    Rectangle<int> getBounds() const
+    {
+        if (bitmap == nullptr)
+            return {};
 
+        const auto size = bitmap->GetPixelSize();
+        return Rectangle { (int) size.width, (int) size.height }.withPosition (topLeft);
+    }
 
- BEGIN_JUCE_MODULE_DECLARATION
+    /*  The stored subsection bitmap. */
+    ComSmartPtr<ID2D1Bitmap1> bitmap;
 
-  ID:                 juce_animation
-  vendor:             juce
-  version:            8.0.6
-  name:               JUCE Animation classes
-  description:        Classes for defining and handling animations.
-  website:            http://www.juce.com/juce
-  license:            AGPLv3/Commercial
-  minimumCppStandard: 17
+    /*  The top-left position of this virtual bitmap inside the virtual bitmap. */
+    Point<int> topLeft;
+};
 
-  dependencies:       juce_gui_basics
-
- END_JUCE_MODULE_DECLARATION
-
-*******************************************************************************/
-
-
-#pragma once
-#define JUCE_ANIMATION_H_INCLUDED
-
-#include <juce_gui_basics/juce_gui_basics.h>
-
-//==============================================================================
-#include "detail/juce_ArrayAndTupleOps.h"
-
-//==============================================================================
-#include "animation/juce_Animator.h"
-#include "animation/juce_AnimatorSetBuilder.h"
-#include "animation/juce_AnimatorUpdater.h"
-#include "animation/juce_Easings.h"
-#include "animation/juce_StaticAnimationLimits.h"
-#include "animation/juce_ValueAnimatorBuilder.h"
-#include "animation/juce_VBlankAnimatorUpdater.h"
+} // namespace juce
