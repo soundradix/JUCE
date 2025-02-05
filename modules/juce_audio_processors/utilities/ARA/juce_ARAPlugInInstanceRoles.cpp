@@ -56,13 +56,13 @@ void ARARenderer::prepareToPlay ([[maybe_unused]] double sampleRate,
                                  [[maybe_unused]] AudioProcessor::ProcessingPrecision precision,
                                  [[maybe_unused]] AlwaysNonRealtime alwaysNonRealtime) {}
 
+//==============================================================================
+#if ARA_VALIDATE_API_CALLS
 static bool apiSupportsToggleRendering()
 {
     return PluginHostType::jucePlugInClientCurrentWrapperType != AudioProcessor::WrapperType::wrapperType_AAX;
 }
 
-//==============================================================================
-#if ARA_VALIDATE_API_CALLS
 void ARAPlaybackRenderer::addPlaybackRegion (ARA::ARAPlaybackRegionRef playbackRegionRef) noexcept
 {
     if (araExtension && apiSupportsToggleRendering())
