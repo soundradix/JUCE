@@ -2162,17 +2162,20 @@ void Component::internalMouseDown (MouseInputSource source,
 
     HierarchyChecker checker (this, me);
 
+    Component* validComponent = this;
+
     if (isCurrentlyBlockedByAnotherModalComponent())
     {
         flags.mouseDownWasBlocked = true;
         internalModalInputAttempt();
 
-        if (checker.shouldBailOut())
+        validComponent = checker.nearestNonNullParent();
+        if (validComponent == nullptr)
             return;
 
         // If processing the input attempt has exited the modal loop, we'll allow the event
         // to be delivered..
-        if (isCurrentlyBlockedByAnotherModalComponent())
+        if (validComponent->isCurrentlyBlockedByAnotherModalComponent())
         {
             // allow blocked mouse-events to go to global listeners..
             desktop.getMouseListeners().callChecked (checker, [&] (MouseListener& l) { l.mouseDown (checker.eventWithNearestParent()); });
@@ -2180,9 +2183,9 @@ void Component::internalMouseDown (MouseInputSource source,
         }
     }
 
-    flags.mouseDownWasBlocked = false;
+    validComponent->flags.mouseDownWasBlocked = false;
 
-    for (auto* c = this; c != nullptr; c = c->parentComponent)
+    for (auto* c = validComponent; c != nullptr; c = c->parentComponent)
     {
         if (c->isBroughtToFrontOnMouseClick())
         {
@@ -2193,15 +2196,15 @@ void Component::internalMouseDown (MouseInputSource source,
         }
     }
 
-    grabKeyboardFocusInternal (focusChangedByMouseClick, true, FocusChangeDirection::unknown);
+    validComponent->grabKeyboardFocusInternal (focusChangedByMouseClick, true, FocusChangeDirection::unknown);
 
     if (checker.shouldBailOut())
         return;
 
-    if (flags.repaintOnMouseActivityFlag)
-        repaint();
+    if (validComponent->flags.repaintOnMouseActivityFlag)
+        validComponent->repaint();
 
-    mouseDown (me);
+    validComponent->mouseDown (me);
 
     if (checker.shouldBailOut())
         return;
