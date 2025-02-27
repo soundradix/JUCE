@@ -1624,6 +1624,44 @@ public:
             }
         }
 
+        String getRelativePathFromPropertiesFileDir (const File& filePath) const
+        {
+            return filePath.getRelativePathFrom (getVCProjPropertiesFile().getParentDirectory())
+                           .replace (File::getSeparatorString(), "\\");
+        }
+
+        void fillInPropertiesXml (XmlElement& propertiesXml) const
+        {
+            propertiesXml.setAttribute ("xmlns", "http://schemas.microsoft.com/developer/msbuild/2003");
+
+            auto* propertyGroup  = propertiesXml.createNewChildElement ("PropertyGroup");
+
+            {
+                auto* forceImport = propertyGroup->createNewChildElement ("ForceImportAfterCppTargets");
+                forceImport->addTextElement ("$(PACE_FUSION_HOME)\\scripts\\PaceFusionSetTemp.targets");
+
+                auto* sourceRoot = propertyGroup->createNewChildElement ("PF_BUILD_SOURCE_ROOT");
+                sourceRoot->setAttribute ("Condition", "'$(PF_BUILD_SOURCE_ROOT)' == ''");
+                const auto buildSourceRootRelPath = getRelativePathFromPropertiesFileDir (getOwner().getPaceBuildSourceRoot());
+                sourceRoot->addTextElement ("$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)" + buildSourceRootRelPath + "'))");
+            }
+
+            if (const auto* vst3HelperTarget = getOwner().getTargetOfType (build_tools::ProjectType::Target::VST3Helper))
+            {
+                const auto vst3HelperTargetName = vst3HelperTarget->getName();
+                const auto vst3HelperProjectName = getOwner().getProjectFileBaseName (vst3HelperTargetName);
+                propertyGroup->setAttribute ("Condition", "'$(MSBuildProjectName)' != " + vst3HelperProjectName.quoted ('\''));
+            }
+
+            auto* pfConfigFile = propertyGroup->createNewChildElement ("PF_CONFIG_FILE");
+            pfConfigFile->setAttribute ("Condition", "'$(PF_CONFIG_FILE)' == ''");
+            const auto configFileRelPath = getRelativePathFromPropertiesFileDir (getOwner().getPaceConfigurationFile());
+            pfConfigFile->addTextElement ("$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)" + configFileRelPath + "'))");
+
+            auto* forceImport = propertyGroup->createNewChildElement ("ForceImportAfterCppTargets");
+            forceImport->addTextElement ("$(PACE_FUSION_HOME)\\scripts\\PaceFusion.targets");
+        }
+
         const MSVCProjectExporterBase& getOwner() const { return owner; }
         const String& getProjectGuid() const            { return projectGuid; }
 
@@ -1640,6 +1678,13 @@ public:
                 XmlElement filtersXml (getTopLevelXmlEntity());
                 fillInFiltersXml (filtersXml);
                 writeXmlOrThrow (filtersXml, getVCProjFiltersFile(), "UTF-8", 100);
+            }
+
+            if (getOwner().isPaceProtectionEnabled())
+            {
+                XmlElement propertiesXml (getTopLevelXmlEntity());
+                fillInPropertiesXml (propertiesXml);
+                writeXmlOrThrow (propertiesXml, getVCProjPropertiesFile(), "UTF-8", 100);
             }
         }
 
@@ -2190,6 +2235,7 @@ public:
 
         File getVCProjFile() const                                   { return getOwner().getProjectFile (getProjectFileSuffix(), getName()); }
         File getVCProjFiltersFile() const                            { return getOwner().getProjectFile (getFiltersFileSuffix(), getName()); }
+        File getVCProjPropertiesFile() const                         { return getOwner().getTargetFolder().getChildFile ("directory.build.props"); }
 
         String createRebasedPath (const build_tools::RelativePath& path) const { return getOwner().createRebasedPath (path); }
 
@@ -2259,6 +2305,7 @@ public:
     bool isiOS() const override                              { return false; }
 
     bool supportsPrecompiledHeaders() const override         { return true; }
+    bool supportsPaceProtection() const override             { return true; }
 
     String getNewLineString() const override                 { return "\r\n"; }
 
@@ -2385,22 +2432,23 @@ public:
         jassert (targets.size() > 0);
     }
 
-    const MSVCTarget* getSharedCodeTarget() const
+    const MSVCTarget* getTargetOfType (build_tools::ProjectType::Target::Type targetType) const
     {
         for (auto target : targets)
-            if (target->type == build_tools::ProjectType::Target::SharedCodeTarget)
+            if (target->type == targetType)
                 return target;
 
         return nullptr;
     }
 
+    const MSVCTarget* getSharedCodeTarget() const
+    {
+        return getTargetOfType (build_tools::ProjectType::Target::SharedCodeTarget);
+    }
+
     bool hasTarget (build_tools::ProjectType::Target::Type type) const
     {
-        for (auto target : targets)
-            if (target->type == type)
-                return true;
-
-        return false;
+        return getTargetOfType (type) != nullptr;
     }
 
     static void createRCFile (const Project& p, const File& iconFile, const File& rcFile)
@@ -2440,11 +2488,7 @@ protected:
 
     String getProjectFileBaseName (const String& target) const
     {
-        const auto filename = project.getProjectFilenameRootString();
-
-        return filename + (target.isNotEmpty()
-                           ? (String ("_") + target.removeCharacters (" "))
-                           : "");
+        return project.getTargetBaseName (target);
     }
 
     File getProjectFile (const String& extension, const String& target) const
