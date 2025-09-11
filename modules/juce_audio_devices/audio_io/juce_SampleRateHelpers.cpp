@@ -21,7 +21,7 @@ namespace juce::SampleRateHelpers
 
 static inline const std::vector<double>& getAllSampleRates()
 {
-    static auto sampleRates = []
+    static auto sampleRates = std::invoke ([]
     {
         std::vector<double> result;
         constexpr double baseRates[] = { 8000.0, 11025.0, 12000.0 };
@@ -33,7 +33,7 @@ static inline const std::vector<double>& getAllSampleRates()
                                rate);
 
         return result;
-    }();
+    });
 
     return sampleRates;
 }
