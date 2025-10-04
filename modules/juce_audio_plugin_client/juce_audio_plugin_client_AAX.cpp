@@ -968,15 +968,43 @@ namespace AAXClasses
 
                     jassert(getAAXProcessor().getPluginInstance().getMainBusNumInputChannels() == numOfMainInputs);
 
+                    // STEP 1: Prime the plugin's internal delay buffers
+                    // We need to process 'latencyOffset' samples to fill the delay line
                     int32_t remainingDelaySamplesToPrime = latencyOffset;
                     while (remainingDelaySamplesToPrime > 0)
                     {
+                        // Calculate how many samples to prime in this iteration
                         int32_t numSamplesToPrime = std::min (*ioWindowSize, remainingDelaySamplesToPrime);
-                        const int64_t firstSampleLocation = GetLocation() + (latencyOffset - remainingDelaySamplesToPrime);
-                        GetAudio (inAudioIns, inAudioInCount, firstSampleLocation, ioWindowSize);
-                        auto firstBuffer = getRenderAudioBuffer (inputChannelList, outputChannelList, ioWindowSize);
-                        getAAXProcessor().getPluginInstance().processBlock (firstBuffer, emptyMidiBuffer);
-                        remainingDelaySamplesToPrime -= numSamplesToPrime;
+
+                        // Calculate where to read from: start of selection + samples already primed
+                        const int64_t primeSampleLocation = GetLocation() + (latencyOffset - remainingDelaySamplesToPrime);
+
+                        // Read the priming audio
+                        int32_t actualSamplesRead = numSamplesToPrime;
+                        GetAudio (inAudioIns, inAudioInCount, primeSampleLocation, &actualSamplesRead);
+
+                        // Create buffer for priming (using temporary output buffers, we'll discard the output)
+                        Array<const float*> primeInputList;
+                        Array<float*> primeOutputList;
+
+                        for (int ch = 0; ch < numOfMainInputs; ++ch)
+                            primeInputList.add(inAudioIns[ch]);
+
+                        for (decltype(inAudioOutCount) ch = 0; ch < inAudioOutCount; ++ch)
+                            primeOutputList.add(tempOutBuffer[ch]);
+
+                        // Create the buffer with the actual number of samples read
+                        AudioSampleBuffer primeBuffer (primeOutputList.getRawDataPointer(), primeOutputList.size(), actualSamplesRead);
+
+                        // Copy input to output for processing
+                        for (int ch = 0; ch < jmin(primeInputList.size(), primeOutputList.size()); ++ch)
+                            FloatVectorOperations::copy (primeOutputList[ch], primeInputList[ch], actualSamplesRead);
+
+                        // Process through delay line to prime it (output is discarded)
+                        getAAXProcessor().getPluginInstance().processBlock (primeBuffer, emptyMidiBuffer);
+
+                        // Move forward by the actual number of samples we primed
+                        remainingDelaySamplesToPrime -= actualSamplesRead;
                     }
 
                     for (decltype(inAudioOutCount) ch = 0; ch < inAudioOutCount; ++ch)
@@ -985,6 +1013,10 @@ namespace AAXClasses
                     }
                     mIsFirstPass = false;
                 }
+
+                // STEP 2: Process with lookahead compensation
+                // Read audio from 'current position + latency offset'
+                // This compensates for the delay inside processBlock
 
                 // Look ahead in the input audio by latencyOffset. After this call to GetAudio(),
                 // inAudioIns will be populated with the randomly-accessed lookahead samples.
