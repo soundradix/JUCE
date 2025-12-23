@@ -23,6 +23,10 @@
   ==============================================================================
 */
 
+#if JUCE_DEBUG
+#define JUCE_ENABLE_PAINT_PROFILING 1
+#endif
+
 #define JUCE_ASSERT_MESSAGE_MANAGER_IS_LOCKED_OR_OFFSCREEN \
     jassert ((MessageManager::getInstanceWithoutCreating() != nullptr \
                && MessageManager::getInstanceWithoutCreating()->currentThreadHasLockedMessageManager()) \
@@ -30,6 +34,10 @@
 
 namespace juce
 {
+
+#if JUCE_ENABLE_PAINT_PROFILING
+std::function<void(Component *)> Component::onPaintBegin, Component::onPaintEnd;
+#endif
 
 static Component* findFirstEnabledAncestor (Component* in)
 {
@@ -1672,6 +1680,11 @@ void Component::paintComponentAndChildren (Graphics& g)
 {
     auto clipBounds = g.getClipBounds();
 
+#if JUCE_ENABLE_PAINT_PROFILING
+    if (onPaintBegin)
+        onPaintBegin (this);
+#endif
+
     if (flags.dontClipGraphicsFlag && getNumChildComponents() == 0)
     {
         paint (g);
@@ -1683,6 +1696,11 @@ void Component::paintComponentAndChildren (Graphics& g)
         if (! (detail::ComponentHelpers::clipObscuredRegions (*this, g, clipBounds, {}) && g.isClipEmpty()))
             paint (g);
     }
+
+#if JUCE_ENABLE_PAINT_PROFILING
+    if (onPaintEnd)
+        onPaintEnd (this);
+#endif
 
     for (int i = 0; i < childComponentList.size(); ++i)
     {

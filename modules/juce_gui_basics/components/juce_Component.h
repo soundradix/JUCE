@@ -2559,8 +2559,12 @@ public:
     void contains (int, int) = delete;
    #endif
 
-private:
+#if JUCE_DEBUG || JUCE_ENABLE_PAINT_PROFILING
+    static std::function<void(Component *)> onPaintBegin, onPaintEnd;
+    void *paintProfilingData = nullptr;
+#endif
 
+private:
     //==============================================================================
     friend class ComponentPeer;
     friend class detail::MouseInputSourceImpl;
