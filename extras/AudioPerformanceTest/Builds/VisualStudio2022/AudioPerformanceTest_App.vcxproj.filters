@@ -2251,6 +2251,9 @@
     <ClCompile Include="..\..\..\..\modules\juce_graphics\colour\juce_FillType.cpp">
       <Filter>JUCE Modules\juce_graphics\colour</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\..\..\modules\juce_graphics\colour\juce_PixelFormats.cpp">
+      <Filter>JUCE Modules\juce_graphics\colour</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\..\..\modules\juce_graphics\contexts\juce_GraphicsContext.cpp">
       <Filter>JUCE Modules\juce_graphics\contexts</Filter>
     </ClCompile>
