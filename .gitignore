@@ -53,6 +53,7 @@ profile
 **/Builds/Android/lib/.externalNativeBuild
 **/Builds/MacOSX/**/Index
 **/Builds/MacOSX/**/Intermediates.noindex
+**/Builds/MacOSX/DerivedData
 **/doxygen/doc
 **/doxygen/build
 **/.idea
