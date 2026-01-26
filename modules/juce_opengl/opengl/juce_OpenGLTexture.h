@@ -100,6 +100,8 @@ public:
     */
     static bool isValidSize (int width, int height);
 
+    bool flipped;
+
 private:
     GLuint textureID;
     int width, height;

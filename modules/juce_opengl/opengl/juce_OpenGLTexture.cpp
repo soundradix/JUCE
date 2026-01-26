@@ -36,7 +36,7 @@ namespace juce
 {
 
 OpenGLTexture::OpenGLTexture()
-    : textureID (0), width (0), height (0), ownerContext (nullptr)
+    : textureID (0), width (0), height (0), flipped (false), ownerContext (nullptr)
 {
 }
 
@@ -89,6 +89,7 @@ void OpenGLTexture::create (const int w, const int h, const void* pixels, GLenum
 
     width  = getAllowedTextureSize (w);
     height = getAllowedTextureSize (h);
+    flipped = false;
 
     const GLint internalformat = type == GL_ALPHA ? GL_ALPHA : GL_RGBA;
 
@@ -107,6 +108,8 @@ void OpenGLTexture::create (const int w, const int h, const void* pixels, GLenum
     }
 
     JUCE_CHECK_OPENGL_ERROR
+
+    flipped = false;
 }
 
 template <class PixelType>
@@ -140,8 +143,15 @@ void OpenGLTexture::loadImage (const Image& image)
     const int imageW = image.getWidth();
     const int imageH = image.getHeight();
 
-    HeapBlock<PixelARGB> dataCopy;
     Image::BitmapData srcData (image, Image::BitmapData::readOnly);
+    if (srcData.pixelFormat == Image::ARGB && srcData.pixelStride == 4)
+    {
+        create (imageW, imageH, srcData.data, JUCE_RGBA_FORMAT, true);
+        flipped = true;
+        return;
+    }
+
+    HeapBlock<PixelARGB> dataCopy;
 
     switch (srcData.pixelFormat)
     {

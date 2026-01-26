@@ -45,6 +45,7 @@ struct TextureInfo
     GLuint textureID;
     int imageWidth, imageHeight;
     float fullWidthProportion, fullHeightProportion;
+    bool flipped = false;
 };
 
 //==============================================================================
@@ -137,6 +138,7 @@ struct CachedImageList final : public ReferenceCountedObject,
             t.imageHeight = pixelData->height;
             t.fullWidthProportion  = (float) t.imageWidth  / (float) texture.getWidth();
             t.fullHeightProportion = (float) t.imageHeight / (float) texture.getHeight();
+            t.flipped = texture.flipped;
 
             lastUsed = Time::getCurrentTime();
             return t;
@@ -689,10 +691,14 @@ struct ShaderPrograms final : public ReferenceCountedObject
         void setMatrix (const AffineTransform& trans, const TextureInfo& textureInfo,
                         float targetX, float targetY, bool isForTiling) const
         {
-            setMatrix (trans,
-                       textureInfo.imageWidth, textureInfo.imageHeight,
-                       textureInfo.fullWidthProportion, textureInfo.fullHeightProportion,
-                       targetX, targetY, isForTiling);
+            setMatrix (
+                textureInfo.flipped
+                ? AffineTransform::translation (0, textureInfo.imageHeight).followedBy (trans)
+                : trans,
+                textureInfo.imageWidth,
+                textureInfo.flipped ? -textureInfo.imageHeight : textureInfo.imageHeight,
+                textureInfo.fullWidthProportion, textureInfo.fullHeightProportion,
+                targetX, targetY, isForTiling);
         }
 
         OpenGLShaderProgram::Uniform imageTexture, matrix, imageLimits;
