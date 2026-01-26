@@ -2627,7 +2627,6 @@ public:
    #endif
 
 private:
-
     //==============================================================================
     friend class ComponentPeer;
     friend class detail::MouseInputSourceImpl;
@@ -2707,6 +2706,11 @@ private:
     static void internalMouseMove  (SafePointer<Component>, MouseInputSource, Point<float>, Time);
     static void internalMouseWheel (SafePointer<Component>, MouseInputSource, Point<float>, Time, const MouseWheelDetails&);
     static void internalMagnifyGesture (SafePointer<Component>, MouseInputSource, Point<float>, Time, float);
+#if JUCE_DEBUG || JUCE_ENABLE_PAINT_PROFILING
+    static std::function<void(Component *)> onPaintBegin, onPaintEnd;
+    void *paintProfilingData = nullptr;
+#endif
+
     void internalBroughtToFront();
     void internalKeyboardFocusGain (FocusChangeType, const WeakReference<Component>&, FocusChangeDirection);
     void internalKeyboardFocusGain (FocusChangeType);
