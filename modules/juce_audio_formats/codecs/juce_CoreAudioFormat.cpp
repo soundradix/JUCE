@@ -836,6 +836,13 @@ void CoreAudioFormat::registerFormats (AudioFormatManager& formats)
     for (int k = (int) StreamKind::kAiff; k <= (int) StreamKind::kAmr; ++k)
         formats.registerFormat (new CoreAudioFormat ((StreamKind) k), false);
 }
+std::unique_ptr<AudioFormatWriter> CoreAudioFormat::createWriterFor (std::unique_ptr<OutputStream>&,
+                                                                     const AudioFormatWriterOptions&)
+{
+    jassertfalse; // not yet implemented!
+    return nullptr;
+}
+
 
 //==============================================================================
 //==============================================================================
