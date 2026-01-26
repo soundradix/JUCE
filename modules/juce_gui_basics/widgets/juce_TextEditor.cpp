@@ -947,10 +947,11 @@ void TextEditor::updateBaseShapedTextOptions()
 {
     auto options = detail::ShapedText::Options{}.withTrailingWhitespacesShouldFit (true)
                                                 .withJustification (getJustificationType().getOnlyHorizontalFlags())
+                                                .withDrawLinesInFull()
                                                 .withLeading (lineSpacing);
 
     if (wordWrap)
-        options = options.withMaxWidth ((float) getMaximumTextWidth());
+        options = options.withWordWrapWidth ((float) getMaximumTextWidth());
     else
         options = options.withAlignmentWidth ((float) getMaximumTextWidth());
 
