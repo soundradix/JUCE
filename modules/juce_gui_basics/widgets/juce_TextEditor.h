@@ -906,8 +906,17 @@ private:
     void insert (const String&, int insertIndex, const Font&, Colour, UndoManager*, int newCaretPos);
     void reinsert (const TextEditorStorageChunks& chunks);
     void remove (Range<int>, UndoManager*, int caretPositionToMoveTo, TextEditorStorageChunks* removedOut = nullptr);
-    std::pair<Point<float>, float> getTextSelectionEdge (int index, Edge edge) const;
-    std::pair<Point<float>, float> getCursorEdge (const CaretState& caret) const;
+
+    struct CaretEdge
+    {
+        Point<float> anchor;
+        float height{};
+    };
+
+    float getJustificationOffsetX() const;
+    CaretEdge getDefaultCursorEdge() const;
+    CaretEdge getTextSelectionEdge (int index, Edge edge) const;
+    CaretEdge getCursorEdge (const CaretState& caret) const;
     void updateCaretPosition();
     void updateValueFromText();
     void textWasChangedByValue();

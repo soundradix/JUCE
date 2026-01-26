@@ -661,7 +661,7 @@ void TextEditor::repaintText (Range<int> range)
             const auto info = getCursorEdge (caretState.withPosition (range.getEnd())
                                                        .withPreferredEdge (Edge::leading));
 
-            y2 = (int) (info.first.y + lh * 2.0f);
+            y2 = (int) (info.anchor.y + lh * 2.0f);
         }
 
         const auto offset = getYOffset();
@@ -872,7 +872,7 @@ Range<int64> TextEditor::getLineRangeForIndex (int index)
                + lastParagraphItem.range.getStart();
 }
 
-std::pair<Point<float>, float> TextEditor::getTextSelectionEdge (int index, Edge edge) const
+TextEditor::CaretEdge TextEditor::getTextSelectionEdge (int index, Edge edge) const
 {
     jassert (0 <= index && index < getTotalNumChars());
     const auto textRange = Range<int64>::withStartAndLength ((int64) index, 1);
@@ -889,13 +889,19 @@ std::pair<Point<float>, float> TextEditor::getTextSelectionEdge (int index, Edge
     auto& paragraph = paragraphIt->value;
     const auto& shapedText = paragraph->getShapedText();
 
-    const auto glyphRange = std::invoke ([&]
+    const auto glyphRange = std::invoke ([&]() -> Range<int64>
     {
         std::vector<Range<int64>> g;
         shapedText.getGlyphRanges (textRange - paragraph->getRange().getStart(), g);
-        jassert (! g.empty());
+
+        if (g.empty())
+            return {};
+
         return g.front();
     });
+
+    if (glyphRange.isEmpty())
+        return getDefaultCursorEdge();
 
     const auto glyphsBounds = shapedText.getGlyphsBounds (glyphRange).getRectangle (0);
     const auto ltr = shapedText.isLtr (glyphRange.getStart());
@@ -917,11 +923,15 @@ std::pair<Point<float>, float> TextEditor::getTextSelectionEdge (int index, Edge
 
 void TextEditor::updateBaseShapedTextOptions()
 {
-    textStorage->setBaseShapedTextOptions (detail::ShapedText::Options{}
-                                               .withMaxWidth ((float) getWordWrapWidth())
-                                               .withTrailingWhitespacesShouldFit (true)
-                                               .withJustification (getJustificationType().getOnlyHorizontalFlags()),
-                                           passwordCharacter);
+    auto options = detail::ShapedText::Options{}.withTrailingWhitespacesShouldFit (true)
+                                                .withJustification (getJustificationType().getOnlyHorizontalFlags());
+
+    if (wordWrap)
+        options = options.withMaxWidth ((float) getMaximumTextWidth());
+    else
+        options = options.withAlignmentWidth ((float) getMaximumTextWidth());
+
+    textStorage->setBaseShapedTextOptions (options, passwordCharacter);
 }
 
 static auto asInt64Range (Range<int> r)
@@ -1698,8 +1708,8 @@ TextEditor::Edge TextEditor::getEdgeTypeCloserToPosition (int indexInText, Point
 {
     const auto testCaret = caretState.withPosition (indexInText);
 
-    const auto leading = getCursorEdge (testCaret.withPreferredEdge (Edge::leading)).first.getDistanceFrom (pos);
-    const auto trailing = getCursorEdge (testCaret.withPreferredEdge (Edge::trailing)).first.getDistanceFrom (pos);
+    const auto leading = getCursorEdge (testCaret.withPreferredEdge (Edge::leading)).anchor.getDistanceFrom (pos);
+    const auto trailing = getCursorEdge (testCaret.withPreferredEdge (Edge::trailing)).anchor.getDistanceFrom (pos);
 
     if (leading < trailing)
         return Edge::leading;
@@ -2135,7 +2145,22 @@ bool TextEditor::isEmpty() const
     return getTotalNumChars() == 0;
 }
 
-std::pair<Point<float>, float> TextEditor::getCursorEdge (const CaretState& tempCaret) const
+float TextEditor::getJustificationOffsetX() const
+{
+    const auto bottomRightX = (float) getMaximumTextWidth();
+
+    if (justification.testFlags (Justification::horizontallyCentred)) return jmax (0.0f, bottomRightX * 0.5f);
+    if (justification.testFlags (Justification::right))               return jmax (0.0f, bottomRightX);
+
+    return 0.0f;
+}
+
+TextEditor::CaretEdge TextEditor::getDefaultCursorEdge() const
+{
+    return { { getJustificationOffsetX(), 0.0f }, currentFont.getHeight() };
+}
+
+TextEditor::CaretEdge TextEditor::getCursorEdge (const CaretState& tempCaret) const
 {
     const auto visualIndex = tempCaret.getVisualIndex();
     jassert (0 <= visualIndex && visualIndex <= getTotalNumChars());
@@ -2143,18 +2168,8 @@ std::pair<Point<float>, float> TextEditor::getCursorEdge (const CaretState& temp
     if (getWordWrapWidth() <= 0)
         return { {}, currentFont.getHeight() };
 
-    const auto getJustificationOffsetX = [&]
-    {
-        const auto bottomRightX = (float) getMaximumTextWidth();
-
-        if (justification.testFlags (Justification::horizontallyCentred)) return jmax (0.0f, bottomRightX * 0.5f);
-        if (justification.testFlags (Justification::right))               return jmax (0.0f, bottomRightX);
-
-        return 0.0f;
-    };
-
     if (textStorage->isEmpty())
-        return { { getJustificationOffsetX(), 0.0f }, currentFont.getHeight() };
+        return getDefaultCursorEdge();
 
     if (visualIndex == getTotalNumChars())
     {
