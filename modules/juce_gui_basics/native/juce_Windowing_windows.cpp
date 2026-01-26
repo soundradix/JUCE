@@ -1975,6 +1975,8 @@ public:
         if (wParam & MK_LBUTTON)   mouseMods |= ModifierKeys::leftButtonModifier;
         if (wParam & MK_RBUTTON)   mouseMods |= ModifierKeys::rightButtonModifier;
         if (wParam & MK_MBUTTON)   mouseMods |= ModifierKeys::middleButtonModifier;
+        if (wParam & MK_XBUTTON1)  mouseMods |= ModifierKeys::backButtonModifier;
+        if (wParam & MK_XBUTTON2)  mouseMods |= ModifierKeys::forwardButtonModifier;
 
         ModifierKeys::currentModifiers = ModifierKeys::getCurrentModifiers().withoutMouseButtons().withFlags (mouseMods);
         updateKeyModifiers();
@@ -4058,12 +4060,14 @@ private:
             case WM_LBUTTONDOWN:
             case WM_MBUTTONDOWN:
             case WM_RBUTTONDOWN:
+            case WM_XBUTTONDOWN:
                 doMouseDown (lParam, wParam);
                 return 0;
 
             case WM_LBUTTONUP:
             case WM_MBUTTONUP:
             case WM_RBUTTONUP:
+            case WM_XBUTTONUP:
                 doMouseUp (getPointFromLocalLParam (lParam), wParam);
                 return 0;
 
