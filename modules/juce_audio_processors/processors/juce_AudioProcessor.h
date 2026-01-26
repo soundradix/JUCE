@@ -1577,9 +1577,6 @@ protected:
     AudioFormatReader* randomAudioReader = nullptr;
 #endif
 
-    /** @internal */
-    void sendParamChangeMessageToListeners (int parameterIndex, float newValue);
-
 public:
     /** @cond */
     // These methods are all deprecated in favour of using AudioProcessorParameter
@@ -1600,9 +1597,6 @@ public:
     [[deprecated]] virtual bool isParameterAutomatable (int parameterIndex) const;
     [[deprecated]] virtual bool isMetaParameter (int parameterIndex) const;
     [[deprecated]] virtual AudioProcessorParameter::Category getParameterCategory (int parameterIndex) const;
-    [[deprecated]] void beginParameterChangeGesture (int parameterIndex);
-    [[deprecated]] void endParameterChangeGesture (int parameterIndex);
-    [[deprecated]] void setParameterNotifyingHost (int parameterIndex, float newValue);
 
     // These functions are deprecated: your audio processor can inform the host
     // on its bus and channel layouts and names using the AudioChannelSet and various bus classes.
