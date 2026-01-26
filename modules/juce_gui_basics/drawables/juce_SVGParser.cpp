@@ -449,7 +449,7 @@ public:
         }
 
         // paths that finish back at their start position often seem to be
-        // left without a 'z', so need to be closed explicitly..
+        // left without a 'z', so need to be closed explicitly
         if (path.getCurrentPosition() == subpathStart)
             path.closeSubPath();
     }
@@ -944,7 +944,7 @@ private:
             auto radius = getCoordLength (fillXml->getStringAttribute ("r", "50%"), gradientWidth);
             gradient.point2 = gradient.point1 + Point<float> (radius, 0.0f);
 
-            //xxx (the fx, fy focal point isn't handled properly here..)
+            //xxx (the fx, fy focal point isn't handled properly here)
         }
         else
         {

@@ -1718,7 +1718,7 @@ public:
         lastMousePos = Desktop::getInstance().getDisplays().physicalToLogical (sysPos);
         auto pos = globalToLocal (lastMousePos);
 
-        // this forces a mouse-enter/up event, in case for some reason we didn't get a mouse-up before.
+        // this forces a mouse-enter/up event, in case for some reason we didn't get a mouse-up before
         handleMouseEvent (MouseInputSource::InputSourceType::touch,
                           pos,
                           ModifierKeys::currentModifiers.withoutMouseButtons(),
@@ -1763,6 +1763,8 @@ public:
         if (touchesDown == 0)
             ModifierKeys::currentModifiers = ModifierKeys::currentModifiers.withoutMouseButtons();
 
+        WeakReference self { this };
+
         handleMouseEvent (MouseInputSource::InputSourceType::touch,
                           pos,
                           ModifierKeys::currentModifiers.withoutMouseButtons(),
@@ -1771,6 +1773,9 @@ public:
                           time,
                           {},
                           index);
+
+        if (self == nullptr)
+            return;
 
         handleMouseEvent (MouseInputSource::InputSourceType::touch,
                           MouseInputSource::offscreenMousePos,
@@ -2542,6 +2547,7 @@ private:
 
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (AndroidComponentPeer)
+    JUCE_DECLARE_WEAK_REFERENCEABLE (AndroidComponentPeer)
 };
 
 //==============================================================================
@@ -2850,7 +2856,7 @@ DECLARE_JNI_CLASS (AndroidDisplayMetrics, "android/util/DisplayMetrics")
 #undef JNI_CLASS_MEMBERS
 
 //==============================================================================
-void Displays::findDisplays (float masterScale)
+void Displays::findDisplays (const Desktop& desktop)
 {
     auto* env = getEnv();
 
@@ -2866,7 +2872,7 @@ void Displays::findDisplays (float masterScale)
 
     d.scale = env->GetFloatField (displayMetrics, AndroidDisplayMetrics.density);
     d.dpi = (d.scale * 160.f);
-    d.scale *= masterScale;
+    d.scale *= desktop.getGlobalScaleFactor();
 
     d.totalArea = Rectangle<int> (env->GetIntField (displayMetrics, AndroidDisplayMetrics.widthPixels),
                                   env->GetIntField (displayMetrics, AndroidDisplayMetrics.heightPixels)) / d.scale;

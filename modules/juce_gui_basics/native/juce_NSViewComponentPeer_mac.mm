@@ -935,13 +935,13 @@ public:
 
         if (([ev modifierFlags] & NSEventModifierFlagCommand) != 0)
         {
-            // for command keys, the key-up event is thrown away, so simulate one..
+            // for command keys, the key-up event is thrown away, so simulate one
             updateKeysDown (ev, false);
             used = (isValidPeer (this) && handleKeyEvent (ev, false)) || used;
         }
 
-        // (If we're running modally, don't allow unused keystrokes to be passed
-        // along to other blocked views..)
+        // If we're running modally, don't allow unused keystrokes to be passed
+        // along to other blocked views.
         if (Component::getCurrentlyModalComponent() != nullptr)
             used = true;
 
@@ -1206,7 +1206,7 @@ public:
     {
         // In plugins, the host could put our plugin window inside a modal window, so this
         // allows us to successfully open other popups. Feels like there could be edge-case
-        // problems caused by this, so let us know if you spot any issues..
+        // problems caused by this, so let us know if you spot any issues.
         return ! JUCEApplication::isStandaloneApp();
     }
 
@@ -2689,7 +2689,7 @@ private:
         {
             // In some host situations, the host will stop modal loops from working
             // correctly if they're called from a mouse event, so we'll trigger
-            // the event asynchronously..
+            // the event asynchronously.
             [self performSelectorOnMainThread: NSViewComponentPeer::asyncMouseDownSelector
                                    withObject: ev
                                 waitUntilDone: NO];
@@ -2706,7 +2706,7 @@ private:
         {
             // In some host situations, the host will stop modal loops from working
             // correctly if they're called from a mouse event, so we'll trigger
-            // the event asynchronously..
+            // the event asynchronously.
             [self performSelectorOnMainThread: NSViewComponentPeer::asyncMouseUpSelector
                                    withObject: ev
                                 waitUntilDone: NO];
@@ -2857,8 +2857,6 @@ struct JuceNSWindowClass final : public NSViewComponentPeerWrapper<ObjCClass<NSW
 
             return false;
         });
-
-        addMethod (@selector (isFlipped), [] (id, SEL) { return true; });
 
         addMethod (@selector (windowWillUseStandardFrame:defaultFrame:), [] (id self, SEL, NSWindow* window, NSRect r)
         {

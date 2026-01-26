@@ -362,7 +362,7 @@ namespace X11ErrorHandling
     // Usually happens when client-server connection is broken
     static int ioErrorHandler (::Display*)
     {
-        DBG ("ERROR: connection to X server broken.. terminating.");
+        DBG ("ERROR: connection to X server broken, terminating.");
 
         if (JUCEApplicationBase::isStandaloneApp())
             MessageManager::getInstance()->stopDispatchLoop();
@@ -1080,7 +1080,7 @@ public:
             }
         }
 
-        // blit results to screen.
+        // blit results to screen
        #if JUCE_USE_XSHM
         if (isUsingXShm())
             X11Symbols::getInstance()->xShmPutImage (display, (::Drawable) window, gc, xImage.get(), sx, sy, dx, dy, dw, dh, True);
@@ -1353,12 +1353,12 @@ namespace ClipboardHelpers
                     return true;
                 }
 
-                return false;  // the format we asked for was denied.. (event.xselection.property == None)
+                return false;  // the format we asked for was denied (event.xselection.property == None)
             }
 
-            // not very elegant.. we could do a select() or something like that...
-            // however clipboard content requesting is inherently slow on x11, it
-            // often takes 50ms or more so...
+            // not very elegant, we could do a select() or something like that;
+            // however, clipboard content requesting is inherently slow on x11, it
+            // often takes 50ms or more so
             Thread::sleep (4);
         }
 
@@ -1739,7 +1739,7 @@ void XWindowSystem::setVisible (::Window windowH, bool shouldBeVisible) const
         X11Symbols::getInstance()->xUnmapWindow (display, windowH);
 }
 
-void XWindowSystem::setBounds (::Window windowH, Rectangle<int> newBounds, bool isFullScreen) const
+std::optional<unsigned long> XWindowSystem::setBounds (::Window windowH, Rectangle<int> newBounds, bool isFullScreen) const
 {
     jassert (windowH != 0);
 
@@ -1795,12 +1795,16 @@ void XWindowSystem::setBounds (::Window windowH, Rectangle<int> newBounds, bool 
             return {};
         }();
 
+        const auto serial = X11Symbols::getInstance()->xNextRequest (display);
         X11Symbols::getInstance()->xMoveResizeWindow (display, windowH,
                                                       newBounds.getX() - nativeWindowBorder.getLeft(),
                                                       newBounds.getY() - nativeWindowBorder.getTop(),
                                                       (unsigned int) newBounds.getWidth(),
                                                       (unsigned int) newBounds.getHeight());
+        return serial;
     }
+
+    return std::nullopt;
 }
 
 void XWindowSystem::startHostManagedResize (::Window windowH,
@@ -2523,7 +2527,7 @@ ModifierKeys XWindowSystem::getNativeRealtimeModifiers() const
 
     XWindowSystemUtilities::ScopedXLock xLock;
 
-    // xQueryPointer doesn't emit masks for back/forward buttons.
+    // xQueryPointer doesn't emit masks for back/forward buttons
     if (X11Symbols::getInstance()->xQueryPointer (display,
                                                   X11Symbols::getInstance()->xRootWindow (display,
                                                                                           X11Symbols::getInstance()->xDefaultScreen (display)),
@@ -2656,7 +2660,7 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
                                                   + ((static_cast<double> (crtc->height) * 25.4 * 0.5) / static_cast<double> (output->mm_height));
 
                                         auto scale = DisplayHelpers::getDisplayScale (output->name, d.dpi);
-                                        scale = (scale <= 0.1 || ! JUCEApplicationBase::isStandaloneApp()) ? 1.0 : scale;
+                                        scale = scale <= 0.1 ? 1.0 : scale;
 
                                         d.scale = masterScale * scale;
 
@@ -3231,7 +3235,7 @@ bool XWindowSystem::initialiseXDisplay()
         displayName = ":0.0";
 
     // it seems that on some systems XOpenDisplay will occasionally
-    // fail the first time, but succeed on a second attempt..
+    // fail the first time, but succeed on a second attempt
     for (int retries = 2; --retries >= 0;)
     {
         display = X11Symbols::getInstance()->xOpenDisplay (displayName.toUTF8());
@@ -3783,6 +3787,11 @@ void XWindowSystem::dismissBlockingModals (LinuxComponentPeer* peer) const
 
 void XWindowSystem::handleConfigureNotifyEvent (LinuxComponentPeer* peer, XConfigureEvent& confEvent) const
 {
+    // If the incoming event serial is smaller than the serial of a move/resize request we sent previously,
+    // then we should ignore the incoming event because it will conflict with the pending request.
+    if (confEvent.serial < peer->getMoveResizeSerial())
+        return;
+
     const ScopedValueSetter<bool> scope { peer->inConfigureNotifyHandler, true };
 
     peer->updateWindowBounds();

@@ -149,13 +149,13 @@ public:
 
     bool setSwapInterval (int numFramesPerSwap)
     {
-        jassert (isActive()); // this can only be called when the context is active..
+        jassert (isActive()); // this can only be called when the context is active
         return wglSwapIntervalEXT != nullptr && wglSwapIntervalEXT (numFramesPerSwap) != FALSE;
     }
 
     int getSwapInterval() const
     {
-        jassert (isActive()); // this can only be called when the context is active..
+        jassert (isActive()); // this can only be called when the context is active
         return wglGetSwapIntervalEXT != nullptr ? wglGetSwapIntervalEXT() : 0;
     }
 
@@ -165,6 +165,8 @@ public:
         {
             if (! approximatelyEqual (nativeScaleFactor, 1.0))
                 bounds = (bounds.toDouble() * nativeScaleFactor).toNearestInt();
+
+            const ScopedThreadDPIAwarenessSetter scope { nativeWindow->getNativeHandle() };
 
             SetWindowPos ((HWND) nativeWindow->getNativeHandle(), nullptr,
                           bounds.getX(), bounds.getY(), bounds.getWidth(), bounds.getHeight(),

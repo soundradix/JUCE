@@ -671,7 +671,7 @@ public:
         // Annoyingly, after changing the rate and buffer size, some devices fail to
         // correctly report their new settings until some random time in the future, so
         // after calling updateDetailsFromDevice, we need to manually bodge these values
-        // to make sure we're using the correct numbers..
+        // to make sure we're using the correct numbers.
         updateDetailsFromDevice (ins, outs);
         sampleRate = newSampleRate;
         bufferSize = bufferSizeSamples;
@@ -1115,14 +1115,17 @@ private:
         for (auto index = 0; index < numInputChans; ++index)
         {
             const auto info = inStream->channelInfo.getReference (index);
-            const auto src = StrideIterator { ((const float*) inInputData->mBuffers[info.streamNum].mData) + info.dataOffsetSamples,
-                                              info.dataStrideSamples }
-                           + (ptrdiff_t) sampleOffset;
+            auto src = StrideIterator { ((const float*) inInputData->mBuffers[info.streamNum].mData) + info.dataOffsetSamples,
+                                        info.dataStrideSamples }
+                     + (ptrdiff_t) sampleOffset;
 
             if (src.stride == 0) // if this is zero, info is invalid
                 continue;
 
-            std::copy (src, src + (ptrdiff_t) numSamplesInChunk, inStream->tempBuffers[(size_t) index]);
+            const auto end = src + (ptrdiff_t) numSamplesInChunk;
+
+            for (auto dst = inStream->tempBuffers[(size_t) index]; src != end; ++dst, ++src)
+                *dst = *src;
         }
 
         // only pass a timestamp for the first chunk of each buffer
@@ -2347,7 +2350,7 @@ public:
         jassert (hasScanned); // need to call scanForDevices() before doing this
 
         // if they're asking for any input channels at all, use the default input, so we
-        // get the built-in mic rather than the built-in output with no inputs..
+        // get the built-in mic rather than the built-in output with no inputs
 
         AudioObjectPropertyAddress pa;
         auto selector = forInput ? kAudioHardwarePropertyDefaultInputDevice

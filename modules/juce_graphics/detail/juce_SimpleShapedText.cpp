@@ -35,6 +35,34 @@
 namespace juce::detail
 {
 
+auto ShapedTextOptions::tie() const
+{
+    return std::tie (justification,
+                     readingDir,
+                     wordWrapWidth,
+                     alignmentWidth,
+                     height,
+                     fontsForRange,
+                     firstLineIndent,
+                     leading,
+                     additiveLineSpacing,
+                     baselineAtZero,
+                     allowBreakingInsideWord,
+                     trailingWhitespacesShouldFit,
+                     maxNumLines,
+                     ellipsis);
+}
+
+bool ShapedTextOptions::operator== (const ShapedTextOptions& other) const
+{
+    return tie() == other.tie();
+}
+
+bool ShapedTextOptions::operator!= (const ShapedTextOptions& other) const
+{
+    return tie() != other.tie();
+}
+
 //==============================================================================
 constexpr hb_script_t getScriptTag (TextScript type)
 {
@@ -153,18 +181,6 @@ static std::optional<ControlCharacter> findControlCharacter (CharPtr it, CharPtr
     return {};
 }
 
-static auto findControlCharacters (Span<const juce_wchar> string)
-{
-    std::map<size_t, ControlCharacter> result;
-    size_t index = 0;
-
-    for (auto it = string.begin(); it != string.end(); ++it, ++index)
-        if (const auto cc = findControlCharacter (it, string.end()))
-            result[index] = *cc;
-
-    return result;
-}
-
 static constexpr hb_feature_t hbFeature (FontFeatureSetting setting)
 {
     return { setting.tag.getTag(),
@@ -210,8 +226,76 @@ static std::vector<hb_feature_t> getHarfbuzzFeatures (Span<const FontFeatureSett
     return features;
 }
 
+/*  Increment b by the requested number of steps, or to e, whichever is reached first. */
+template <typename CharPtr>
+static auto incrementCharPtr (CharPtr b, CharPtr e, int64 steps)
+{
+    while (b != e && steps > 0)
+    {
+        ++b;
+        --steps;
+    }
+
+    return b;
+}
+
+class SanitisedString
+{
+public:
+    static SanitisedString sanitise (const String& stringIn, Range<int64> lineRange)
+    {
+        SanitisedString result;
+
+        const auto end = stringIn.end();
+        const auto beginOfRange = incrementCharPtr (stringIn.begin(), end, lineRange.getStart());
+        const auto endOfRange = incrementCharPtr (beginOfRange, end, lineRange.getLength());
+
+        result.characters.reserve (beginOfRange.lengthUpTo (endOfRange));
+
+        for (auto it = beginOfRange; it != endOfRange; ++it)
+        {
+            const auto cc = findControlCharacter (it, end);
+
+            if (cc == ControlCharacter::cr || cc == ControlCharacter::lf)
+                result.newlineIndices.push_back (result.characters.size());
+
+            result.characters.push_back (std::invoke ([&]
+            {
+                if (! cc.has_value())
+                    return *it;
+
+                constexpr juce_wchar wordJoiner       = 0x2060;
+                constexpr juce_wchar nonBreakingSpace = 0x00a0;
+
+                return cc == ControlCharacter::crFollowedByLf ? wordJoiner : nonBreakingSpace;
+            }));
+        }
+
+        return result;
+    }
+
+    bool isNewline (size_t index) const
+    {
+        return std::binary_search (newlineIndices.begin(), newlineIndices.end(), index);
+    }
+
+    const juce_wchar* data() const
+    {
+        return characters.data();
+    }
+
+    size_t size() const
+    {
+        return characters.size();
+    }
+
+private:
+    std::vector<juce_wchar> characters;
+    std::vector<size_t> newlineIndices;
+};
+
 /*  Returns glyphs in logical order as that favours wrapping. */
-static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
+static std::vector<ShapedGlyph> lowLevelShape (const SanitisedString& string,
                                                Range<int64> range,
                                                const Font& font,
                                                TextScript script,
@@ -236,7 +320,6 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
                          0);
 
     const Span shapedSpan { string.data() + range.getStart(), (size_t) range.getLength() };
-    const auto controlChars = findControlCharacters (shapedSpan);
 
     for (const auto pair : enumerate (shapedSpan, size_t{}))
         hb_buffer_add (buffer.get(), static_cast<hb_codepoint_t> (pair.value), (unsigned int) pair.index);
@@ -263,13 +346,13 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
 
     hb_shape (nativeFont.get(), buffer.get(), features.data(), (unsigned int) features.size());
 
-    const auto [infos, positions] = [&buffer]
+    const auto [infos, positions] = std::invoke ([&buffer]
     {
         unsigned int count{};
 
         return std::make_pair (Span { hb_buffer_get_glyph_infos     (buffer.get(), &count), (size_t) count },
                                Span { hb_buffer_get_glyph_positions (buffer.get(), &count), (size_t) count });
-    }();
+    });
 
     jassert (infos.size() == positions.size());
 
@@ -327,16 +410,7 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
                                 && font.getTypefacePtr()->getGlyphBounds (font.getMetricsKind(), (int) glyphId).isEmpty()
                                 && xAdvanceBase > 0;
 
-        const auto newline = std::invoke ([&controlChars, &shapingInfos = infos, visualIndex]
-        {
-           const auto it = controlChars.find ((size_t) shapingInfos[visualIndex].cluster);
-
-           if (it == controlChars.end())
-               return false;
-
-           return it->second == ControlCharacter::cr || it->second == ControlCharacter::lf;
-        });
-
+        const auto newline = string.isNewline (infos[visualIndex].cluster + (size_t) range.getStart());
         const auto cluster = (int64) infos[visualIndex].cluster + range.getStart();
 
         const auto numLigaturePlaceholders = std::max ((int64) 0,
@@ -351,7 +425,7 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
         const auto advanceMultiplier = numLigaturePlaceholders == 0 ? 1.0f
                                                                     : 1.0f / (float) (numLigaturePlaceholders + 1);
 
-        Point<float> advance { xAdvanceBase * advanceMultiplier + appliedTracking, yAdvanceBase * advanceMultiplier };
+        const Point advance { xAdvanceBase * advanceMultiplier + appliedTracking, yAdvanceBase * advanceMultiplier };
 
         const auto ligatureClusterNumber = cluster + (ltr ? 0 : numLigaturePlaceholders);
 
@@ -363,8 +437,8 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
             newline,
             numLigaturePlaceholders == 0 ? (int8_t) 0 : (int8_t) -numLigaturePlaceholders ,
             advance,
-            Point<float> { HbScale::hbToJuce (positions[visualIndex].x_offset),
-                           -HbScale::hbToJuce (positions[visualIndex].y_offset) },
+            Point { HbScale::hbToJuce (positions[visualIndex].x_offset),
+                    -HbScale::hbToJuce (positions[visualIndex].y_offset) },
         });
 
         for (int l = 0; l < numLigaturePlaceholders; ++l)
@@ -379,7 +453,7 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
                 newline,
                 (int8_t) (l + 1),
                 advance,
-                Point<float>{},
+                {},
             });
         }
     }
@@ -839,52 +913,10 @@ static auto rangedValuesWithOffset (detail::RangedValues<T> rv, int64 offset = 0
     return rv;
 }
 
-/*  Increment b by the requested number of steps, or to e, whichever is reached first. */
-template <typename CharPtr>
-static auto incrementCharPtr (CharPtr b, CharPtr e, int64 steps)
-{
-    while (b != e && steps > 0)
-    {
-        ++b;
-        --steps;
-    }
-
-    return b;
-}
-
-static std::vector<juce_wchar> sanitiseString (const String& stringIn, Range<int64> lineRange)
-{
-    std::vector<juce_wchar> result;
-
-    const auto end = stringIn.end();
-    const auto beginOfRange = incrementCharPtr (stringIn.begin(), end, lineRange.getStart());
-    const auto endOfRange = incrementCharPtr (beginOfRange, end, lineRange.getLength());
-
-    result.reserve (beginOfRange.lengthUpTo (endOfRange));
-
-    for (auto it = beginOfRange; it != endOfRange; ++it)
-    {
-        result.push_back (std::invoke ([&]
-        {
-            const auto cc = findControlCharacter (it, end);
-
-            if (! cc.has_value())
-                return *it;
-
-            constexpr juce_wchar wordJoiner       = 0x2060;
-            constexpr juce_wchar nonBreakingSpace = 0x00a0;
-
-            return cc == ControlCharacter::crFollowedByLf ? wordJoiner : nonBreakingSpace;
-        }));
-    }
-
-    return result;
-}
-
 struct Shaper
 {
     Shaper (const String& stringIn, Range<int64> lineRange, const ShapedTextOptions& options)
-        : string (sanitiseString (stringIn, lineRange))
+        : string (SanitisedString::sanitise (stringIn, lineRange))
     {
         const auto analysis = Unicode::performAnalysis (stringIn.substring ((int) lineRange.getStart(),
                                                                             (int) lineRange.getEnd()));
@@ -1043,7 +1075,7 @@ struct Shaper
         return result;
     }
 
-    std::vector<juce_wchar> string;
+    SanitisedString string;
     std::vector<size_t> visualOrder;
     RangedValues<ShapingParams> shaperRuns;
     std::vector<int64> softBreakBeforePoints;

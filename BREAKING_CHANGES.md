@@ -1,5 +1,53 @@
 # JUCE breaking changes
 
+# Version 8.0.11
+
+## Change
+
+var::equals(), var::operator==(), and var::operator!=() will now carry out a
+deep equality check when comparing two stored DynamicObjects, as opposed to
+just comparing the objects' addresses, which was the old behaviour.
+
+**Possible Issues**
+
+Program that depend on variants only comparing equal when the object pointers
+are equal will now exhibit unexpected behaviour.
+
+**Workaround**
+
+There is no workaround for this change.
+
+**Rationale**
+
+The previous behaviour was unintuitive, as it meant that two different var
+instances may compare unequal, even when those var instances were both created
+by parsing the same JSON string.
+
+
+## Change
+
+Enabling JUCE_ASIO will now default to using bundled ASIO sources.
+
+**Possible Issues**
+
+Programs that depend on specific versions of the ASIO SDK (perhaps with custom
+modifications) may be broken.
+
+**Workaround**
+
+To use a different version of the ASIO SDK, additionally set the
+JUCE_ASIO_USE_EXTERNAL_SDK module option. If you're happy to use the bundled
+sources, consider removing the custom header include paths you were previously
+using to locate the ASIO headers.
+
+**Rationale**
+
+The bundled headers should be sufficient for the majority of use-cases, so this
+is now the standard option requiring less configuration. Using custom headers
+is an advanced use-case, so it's reasonable that this requires some additional
+configuration, i.e. setting the JUCE_ASIO_USE_EXTERNAL_SDK flag.
+
+
 # Version 8.0.9
 
 ## Change
