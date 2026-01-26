@@ -924,7 +924,7 @@ void Direct2DGraphicsContext::drawImage (const Image& imageIn, const AffineTrans
                     continue;
 
                 const auto src = intersection - pageBounds.getPosition().toFloat();
-                const auto dst = getRect (intersection - pagesAndArea.area.getPosition().toFloat()).toNearestInt().toFloat();
+                const auto dst = getRect (intersection - pagesAndArea.area.getPosition().toFloat());
                 const auto [srcConverted, dstConverted] = std::tuple (D2DUtilities::toRECT_F (src),
                                                                       D2DUtilities::toRECT_F (dst));
 
@@ -945,12 +945,19 @@ void Direct2DGraphicsContext::drawImage (const Image& imageIn, const AffineTrans
                 }
                 else
                 {
+                    const auto lastMode = deviceContext->GetAntialiasMode();
+
+                    if (pagesAndArea.pages.size() > 1)
+                        deviceContext->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+
                     deviceContext->DrawBitmap (page.bitmap,
                                                dstConverted,
                                                currentState->fillType.getOpacity(),
                                                currentState->interpolationMode,
                                                srcConverted,
                                                {});
+
+                    deviceContext->SetAntialiasMode (lastMode);
                 }
             }
         };
@@ -1327,39 +1334,104 @@ public:
                         g.drawImageTransformed (imageToDraw, transform);
                     }
 
-                    compareImages (targetNative, targetSoftware);
+                    auto pixelsToIgnore = createEdgeMask (imageToDraw.getWidth(),
+                                                          imageToDraw.getHeight(),
+                                                          targetNative.getWidth(),
+                                                          targetNative.getHeight(),
+                                                          transform);
+
+                    compareImages (targetNative, targetSoftware, 16, pixelsToIgnore);
                 }
             }
         }
+
+        beginTest ("Check that there is no seam between D2D image tiles");
+        {
+            const auto width = 229;
+            const auto height = 80 * width;
+
+            Image filmStripSoftware { Image::RGB, width, height, true, SoftwareImageType{} };
+
+            {
+                Graphics g { filmStripSoftware };
+                g.setGradientFill ({ Colours::red, 0, 0, Colours::cyan, (float) filmStripSoftware.getWidth(), 0, false });
+                g.fillAll();
+            }
+
+            const auto filmStrip = NativeImageType{}.convert (filmStripSoftware);
+            Image targetNative { Image::RGB, targetDim, targetDim, true, NativeImageType{} };
+            Image targetSoftware { Image::RGB, targetDim, targetDim, true, SoftwareImageType{} };
+            const auto transform = AffineTransform::scale (1.1f);
+
+            for (auto* target : { &targetNative, &targetSoftware })
+            {
+                Graphics g { *target };
+                g.setColour (Colours::orange);
+                g.fillAll();
+                g.addTransform (transform);
+                g.drawImage (filmStrip, 0, 0, width, width, 0, (16384 / width) * width, width, width);
+            }
+
+            auto pixelsToIgnore = createEdgeMask (width,
+                                                  width,
+                                                  targetNative.getWidth(),
+                                                  targetNative.getHeight(),
+                                                  transform);
+
+            compareImages (targetNative, targetSoftware, 1, pixelsToIgnore);
+        }
     }
 
-    void compareImages (const Image& a, const Image& b)
+    static Image createEdgeMask (int sourceWidth,
+                                 int sourceHeight,
+                                 int maskWidth,
+                                 int maskHeight,
+                                 const AffineTransform& transform)
+    {
+        Image mask { Image::SingleChannel, maskWidth, maskHeight, true, SoftwareImageType{} };
+        Graphics g { mask };
+        g.addTransform (transform);
+        g.setColour (Colours::white);
+        g.drawRect (Rectangle<int> { 0, 0, sourceWidth + 1, sourceHeight + 1 }.toFloat(), 2.0f);
+
+        return mask;
+    }
+
+    void compareImages (const Image& a, const Image& b, int stride, const Image& ignoreMask)
     {
         expect (a.getBounds() == b.getBounds());
 
         const Image::BitmapData bitmapA { a, Image::BitmapData::readOnly };
         const Image::BitmapData bitmapB { b, Image::BitmapData::readOnly };
 
+        int64_t maxAbsError{};
         int64_t accumulatedError{};
         int64_t numSamples{};
 
-        for (auto y = 0; y < a.getHeight(); y += 16)
+        for (auto y = 0; y < a.getHeight(); y += stride)
         {
-            for (auto x = 0; x < a.getWidth(); x += 16)
+            for (auto x = 0; x < a.getWidth(); x += stride)
             {
+                if (ignoreMask.getPixelAt (x, y) != Colour{})
+                    continue;
+
                 const auto expected = bitmapA.getPixelColour (x, y);
                 const auto actual   = bitmapB.getPixelColour (x, y);
 
                 for (auto& fn : { &Colour::getRed, &Colour::getGreen, &Colour::getBlue, &Colour::getAlpha })
                 {
-                    accumulatedError += ((int64_t) (actual.*fn)() - (int64_t) (expected.*fn)());
+                    const auto signedError = ((int64_t) (actual.*fn)() - (int64_t) (expected.*fn)());
+                    const auto absError = std::abs (signedError);
+                    maxAbsError = std::max (maxAbsError, absError);
+
+                    accumulatedError += absError;
                     ++numSamples;
                 }
             }
         }
 
         const auto averageError = (double) accumulatedError / (double) numSamples;
-        expect (std::abs (averageError) < 1.0);
+        expect (std::abs (averageError) < 1.0 && maxAbsError < 10);
     }
 };
 

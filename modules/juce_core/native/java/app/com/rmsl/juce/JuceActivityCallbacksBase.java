@@ -32,24 +32,32 @@
   ==============================================================================
 */
 
-/** @cond */
-namespace juce::universal_midi_packets
-{
+package com.rmsl.juce;
 
-/** The kinds of MIDI protocol that can be formatted into Universal MIDI Packets. */
-enum class PacketProtocol
-{
-    MIDI_1_0,
-    MIDI_2_0,
-};
+import android.app.Activity;
+import android.app.Application;
+import android.os.Bundle;
 
-/** All kinds of MIDI protocol understood by JUCE. */
-enum class MidiProtocol
+public class JuceActivityCallbacksBase implements Application.ActivityLifecycleCallbacks
 {
-    bytestream,
-    UMP_MIDI_1_0,
-    UMP_MIDI_2_0,
-};
+    @Override
+    public void onActivityCreated (Activity activity, Bundle savedInstanceState) {}
 
-} // namespace juce::universal_midi_packets
-/** @endcond */
+    @Override
+    public void onActivityStarted (Activity activity) {}
+
+    @Override
+    public void onActivityResumed (Activity activity) {}
+
+    @Override
+    public void onActivityPaused (Activity activity) {}
+
+    @Override
+    public void onActivityStopped (Activity activity) {}
+
+    @Override
+    public void onActivitySaveInstanceState (Activity activity, Bundle outState) {}
+
+    @Override
+    public void onActivityDestroyed (Activity activity) {}
+}

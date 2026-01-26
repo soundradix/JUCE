@@ -1581,7 +1581,7 @@ protected:
     void sendParamChangeMessageToListeners (int parameterIndex, float newValue);
 
 public:
-   #ifndef DOXYGEN
+    /** @cond */
     // These methods are all deprecated in favour of using AudioProcessorParameter
     // and AudioProcessorParameterGroup
     [[deprecated]] virtual int getNumParameters();
@@ -1614,7 +1614,7 @@ public:
     [[deprecated]] virtual const String getOutputChannelName (int channelIndex) const;
     [[deprecated]] virtual bool isInputChannelStereoPair  (int index) const;
     [[deprecated]] virtual bool isOutputChannelStereoPair (int index) const;
-   #endif
+    /** @endcond */
 
 private:
     //==============================================================================

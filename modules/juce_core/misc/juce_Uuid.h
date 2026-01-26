@@ -156,7 +156,7 @@ private:
 
 } // namespace juce
 
-#ifndef DOXYGEN
+/** @cond */
 namespace std
 {
     template <> struct hash<juce::Uuid>
@@ -164,4 +164,4 @@ namespace std
         size_t operator() (const juce::Uuid& u) const noexcept   { return (size_t) u.hash(); }
     };
 }
-#endif
+/** @endcond */
