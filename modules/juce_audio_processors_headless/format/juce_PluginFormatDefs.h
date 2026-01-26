@@ -32,13 +32,46 @@
   ==============================================================================
 */
 
-#if JUCE_PLUGINHOST_LV2 && (! (JUCE_ANDROID || JUCE_IOS))
- #ifndef _CRT_SECURE_NO_WARNINGS
-  #define _CRT_SECURE_NO_WARNINGS
- #endif
+#pragma once
 
- #include <juce_core/system/juce_CompilerWarnings.h>
- #include <juce_core/system/juce_TargetPlatform.h>
+// The following definitions are PRIVATE and should not be queried or modified
+// by user code. These are exclusively used to enable and disable JUCE
+// implementation details.
 
- #include "format_types/juce_LV2SupportLibs.cpp"
+#if defined (JUCE_INTERNAL_HAS_VST) \
+ || defined (JUCE_INTERNAL_HAS_VST3) \
+ || defined (JUCE_INTERNAL_HAS_AU) \
+ || defined (JUCE_INTERNAL_HAS_LADSPA) \
+ || defined (JUCE_INTERNAL_HAS_LV2)
+ #error These preprocessor definitions should not be set by the build system. Use the JUCE_PLUGINHOST_* definitions instead.
+#endif
+
+#if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD || JUCE_IOS)
+ #define JUCE_INTERNAL_HAS_VST 1
+#else
+ #define JUCE_INTERNAL_HAS_VST 0
+#endif
+
+#if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD)
+ #define JUCE_INTERNAL_HAS_VST3 1
+#else
+ #define JUCE_INTERNAL_HAS_VST3 0
+#endif
+
+#if JUCE_PLUGINHOST_AU && (JUCE_MAC || JUCE_IOS)
+ #define JUCE_INTERNAL_HAS_AU 1
+#else
+ #define JUCE_INTERNAL_HAS_AU 0
+#endif
+
+#if JUCE_PLUGINHOST_LADSPA && (JUCE_LINUX || JUCE_BSD)
+ #define JUCE_INTERNAL_HAS_LADSPA 1
+#else
+ #define JUCE_INTERNAL_HAS_LADSPA 0
+#endif
+
+#if JUCE_PLUGINHOST_LV2 && (JUCE_MAC || JUCE_LINUX || JUCE_BSD || JUCE_WINDOWS)
+ #define JUCE_INTERNAL_HAS_LV2 1
+#else
+ #define JUCE_INTERNAL_HAS_LV2 0
 #endif

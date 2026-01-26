@@ -32,21 +32,19 @@
   ==============================================================================
 */
 
+#pragma once
+
 namespace juce
 {
 
-#if (JUCE_PLUGINHOST_LV2 && (! (JUCE_ANDROID || JUCE_IOS))) || DOXYGEN
-
-/**
-    Implements a plugin format for LV2 plugins.
-
-    @tags{Audio}
-*/
-class JUCE_API LV2PluginFormat : public LV2PluginFormatHeadless
+static inline bool arrayContainsPlugin (const OwnedArray<PluginDescription>& list,
+                                        const PluginDescription& desc)
 {
-    void createPluginInstance (const PluginDescription&, double, int, PluginCreationCallback) override;
-};
+    for (auto* p : list)
+        if (p->isDuplicateOf (desc))
+            return true;
 
-#endif
+    return false;
+}
 
 } // namespace juce

@@ -32,89 +32,32 @@
   ==============================================================================
 */
 
+#include <juce_audio_processors_headless/format/juce_PluginFormatDefs.h>
+
 namespace juce
 {
 
-AudioPluginFormatManager::AudioPluginFormatManager() {}
-AudioPluginFormatManager::~AudioPluginFormatManager() {}
-
 //==============================================================================
-void AudioPluginFormatManager::addDefaultFormats()
+void addDefaultFormatsToManager ([[maybe_unused]] AudioPluginFormatManager& manager)
 {
-   #if JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD || JUCE_IOS)
-    #define HAS_VST 1
-   #else
-    #define HAS_VST 0
+   #if JUCE_INTERNAL_HAS_AU
+    manager.addFormat (std::make_unique<AudioUnitPluginFormat>());
    #endif
 
-   #if JUCE_PLUGINHOST_VST3 && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD)
-    #define HAS_VST3 1
-   #else
-    #define HAS_VST3 0
+   #if JUCE_INTERNAL_HAS_VST
+    manager.addFormat (std::make_unique<VSTPluginFormat>());
    #endif
 
-   #if JUCE_PLUGINHOST_AU && (JUCE_MAC || JUCE_IOS)
-    #define HAS_AU 1
-   #else
-    #define HAS_AU 0
+   #if JUCE_INTERNAL_HAS_VST3
+    manager.addFormat (std::make_unique<VST3PluginFormat>());
    #endif
 
-   #if JUCE_PLUGINHOST_LADSPA && (JUCE_LINUX || JUCE_BSD)
-    #define HAS_LADSPA 1
-   #else
-    #define HAS_LADSPA 0
+   #if JUCE_INTERNAL_HAS_LADSPA
+    manager.addFormat (std::make_unique<LADSPAPluginFormat>());
    #endif
 
-   #if JUCE_PLUGINHOST_LV2 && (JUCE_MAC || JUCE_LINUX || JUCE_BSD || JUCE_WINDOWS)
-    #define HAS_LV2 1
-   #else
-    #define HAS_LV2 0
-   #endif
-
-   #if JUCE_DEBUG
-    // you should only call this method once!
-    for (auto* format [[maybe_unused]] : formats)
-    {
-       #if HAS_VST
-        jassert (dynamic_cast<VSTPluginFormat*> (format) == nullptr);
-       #endif
-
-       #if HAS_VST3
-        jassert (dynamic_cast<VST3PluginFormat*> (format) == nullptr);
-       #endif
-
-       #if HAS_AU
-        jassert (dynamic_cast<AudioUnitPluginFormat*> (format) == nullptr);
-       #endif
-
-       #if HAS_LADSPA
-        jassert (dynamic_cast<LADSPAPluginFormat*> (format) == nullptr);
-       #endif
-
-       #if HAS_LV2
-        jassert (dynamic_cast<LV2PluginFormat*> (format) == nullptr);
-       #endif
-    }
-   #endif
-
-   #if HAS_AU
-    formats.add (new AudioUnitPluginFormat());
-   #endif
-
-   #if HAS_VST
-    formats.add (new VSTPluginFormat());
-   #endif
-
-   #if HAS_VST3
-    formats.add (new VST3PluginFormat());
-   #endif
-
-   #if HAS_LADSPA
-    formats.add (new LADSPAPluginFormat());
-   #endif
-
-   #if HAS_LV2
-    formats.add (new LV2PluginFormat());
+   #if JUCE_INTERNAL_HAS_LV2
+    manager.addFormat (std::make_unique<LV2PluginFormat>());
    #endif
 }
 
@@ -128,9 +71,19 @@ Array<AudioPluginFormat*> AudioPluginFormatManager::getFormats() const
     return a;
 }
 
-void AudioPluginFormatManager::addFormat (AudioPluginFormat* format)
+void AudioPluginFormatManager::addFormat (std::unique_ptr<AudioPluginFormat> format)
 {
-    formats.add (format);
+    for (auto* existing : formats)
+    {
+        if (existing->getName() == format->getName())
+        {
+            // This format manager already contains a format with this name!
+            jassertfalse;
+            return;
+        }
+    }
+
+    formats.add (std::move (format));
 }
 
 std::unique_ptr<AudioPluginInstance> AudioPluginFormatManager::createPluginInstance (const PluginDescription& description,

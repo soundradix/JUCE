@@ -32,21 +32,13 @@
   ==============================================================================
 */
 
-namespace juce
-{
+#if JUCE_PLUGINHOST_LV2 && (! (JUCE_ANDROID || JUCE_IOS))
+ #ifndef _CRT_SECURE_NO_WARNINGS
+  #define _CRT_SECURE_NO_WARNINGS
+ #endif
 
-#if (JUCE_PLUGINHOST_LV2 && (! (JUCE_ANDROID || JUCE_IOS))) || DOXYGEN
+ #include <juce_core/system/juce_CompilerWarnings.h>
+ #include <juce_core/system/juce_TargetPlatform.h>
 
-/**
-    Implements a plugin format for LV2 plugins.
-
-    @tags{Audio}
-*/
-class JUCE_API LV2PluginFormat : public LV2PluginFormatHeadless
-{
-    void createPluginInstance (const PluginDescription&, double, int, PluginCreationCallback) override;
-};
-
+ #include <juce_audio_processors_headless/format_types/juce_LV2SupportLibs.cpp>
 #endif
-
-} // namespace juce
