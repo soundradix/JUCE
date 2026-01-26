@@ -473,10 +473,14 @@ public:
 
                 preparedNodes.insert (node->nodeID);
 
-                node->getProcessor()->setProcessingPrecision (node->getProcessor()->supportsDoublePrecisionProcessing() ? current->precision
-                                                                                                                        : AudioProcessor::singlePrecision);
-                node->getProcessor()->setRateAndBufferSizeDetails (current->sampleRate, current->blockSize);
-                node->getProcessor()->prepareToPlay               (current->sampleRate, current->blockSize);
+                auto* nodeProcessor = node->getProcessor();
+                const auto precision = nodeProcessor->supportsDoublePrecisionProcessing()
+                                     ? current->precision
+                                     : AudioProcessor::singlePrecision;
+
+                nodeProcessor->setProcessingPrecision (precision);
+                nodeProcessor->setRateAndBufferSizeDetails (current->sampleRate, current->blockSize);
+                nodeProcessor->prepareToPlay               (current->sampleRate, current->blockSize);
             }
         }
 
@@ -915,6 +919,7 @@ private:
 
         void processWithBuffer (const GlobalIO&, bool bypass, AudioBuffer<FloatType>& audio, MidiBuffer& midi) final
         {
+            const ScopedLock lock { this->processor.getCallbackLock() };
             callProcess (bypass, audio, midi);
         }
 
