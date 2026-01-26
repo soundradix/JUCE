@@ -5063,7 +5063,8 @@ private:
     RectangleList<int> deferredRepaints;
 };
 
-class D2DRenderContext : public RenderContext
+class D2DRenderContext : public RenderContext,
+                         private Direct2DHwndContext::SwapchainDelegate
 {
 public:
     static constexpr auto name = "Direct2D";
@@ -5082,7 +5083,7 @@ public:
         if (transparent != direct2DContext->supportsTransparency())
         {
             direct2DContext.reset();
-            direct2DContext = getContextForPeer (peer);
+            direct2DContext = getContextForPeer (peer, *this);
         }
 
         if (direct2DContext->supportsTransparency())
@@ -5131,6 +5132,11 @@ public:
     }
 
 private:
+    void onSwapchainEvent() override
+    {
+        handleDirect2DPaint();
+    }
+
     struct WrappedD2DHwndContextBase
     {
         virtual ~WrappedD2DHwndContextBase() = default;
@@ -5161,7 +5167,8 @@ private:
     class WrappedD2DHwndContext : public WrappedD2DHwndContextBase
     {
     public:
-        explicit WrappedD2DHwndContext (HWND hwnd) : ctx (hwnd) {}
+        WrappedD2DHwndContext (HWND hwnd, SwapchainDelegate& swapDelegate)
+            : ctx (hwnd, swapDelegate) {}
 
         void addDeferredRepaint (Rectangle<int> area) override
         {
@@ -5477,17 +5484,18 @@ private:
        #endif
     }
 
-    static std::unique_ptr<WrappedD2DHwndContextBase> getContextForPeer (HWNDComponentPeer& peer)
+    static std::unique_ptr<WrappedD2DHwndContextBase> getContextForPeer (HWNDComponentPeer& peer,
+                                                                         SwapchainDelegate& delegate)
     {
         if (peer.getTransparencyKind() != HWNDComponentPeer::TransparencyKind::opaque)
             return std::make_unique<WrappedD2DHwndContextTransparent> (peer);
 
-        return std::make_unique<WrappedD2DHwndContext> (peer.getHWND());
+        return std::make_unique<WrappedD2DHwndContext> (peer.getHWND(), delegate);
     }
 
     HWNDComponentPeer& peer;
 
-    std::unique_ptr<WrappedD2DHwndContextBase> direct2DContext = getContextForPeer (peer);
+    std::unique_ptr<WrappedD2DHwndContextBase> direct2DContext = getContextForPeer (peer, *this);
     UpdateRegion updateRegion;
 
    #if JUCE_ETW_TRACELOGGING
