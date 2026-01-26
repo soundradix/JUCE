@@ -276,7 +276,7 @@ KeyboardComponentBase::NoteAndVelocity KeyboardComponentBase::remappedXYToNote (
 
 Rectangle<float> KeyboardComponentBase::getRectangleForKey (int note) const
 {
-    jassert (note >= rangeStart && note <= rangeEnd);
+    jassert (note >= rangeStart - 1 && note <= rangeEnd + 1);
 
     auto pos = getKeyPos (note);
     auto x = pos.getStart();
