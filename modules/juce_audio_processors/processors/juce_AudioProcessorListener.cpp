@@ -35,26 +35,7 @@
 namespace juce
 {
 
-int RangedAudioParameter::getNumSteps() const
-{
-    const auto& range = getNormalisableRange();
-
-    if (range.interval > 0)
-        return (static_cast<int> ((range.end - range.start) / range.interval) + 1);
-
-    return getDefaultNumParameterSteps();
-}
-
-float RangedAudioParameter::convertTo0to1 (float v) const noexcept
-{
-    const auto& range = getNormalisableRange();
-    return range.convertTo0to1 (range.snapToLegalValue (v));
-}
-
-float RangedAudioParameter::convertFrom0to1 (float v) const noexcept
-{
-    const auto& range = getNormalisableRange();
-    return range.snapToLegalValue (range.convertFrom0to1 (jlimit (0.0f, 1.0f, v)));
-}
+void AudioProcessorListener::audioProcessorParameterChangeGestureBegin (AudioProcessor*, int) {}
+void AudioProcessorListener::audioProcessorParameterChangeGestureEnd   (AudioProcessor*, int) {}
 
 } // namespace juce

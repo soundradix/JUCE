@@ -534,8 +534,8 @@ void AudioProcessor::addParameter (AudioProcessorParameter* param)
     jassert (param != nullptr);
     parameterTree.addChild (std::unique_ptr<AudioProcessorParameter> (param));
 
-    param->processor = this;
-    param->parameterIndex = flatParameterList.size();
+    param->setOwner (&parameterListener);
+    param->setParameterIndex (flatParameterList.size());
     flatParameterList.add (param);
 
     validateParameter (param);
@@ -552,8 +552,8 @@ void AudioProcessor::addParameterGroup (std::unique_ptr<AudioProcessorParameterG
     for (int i = oldSize; i < flatParameterList.size(); ++i)
     {
         auto p = flatParameterList.getUnchecked (i);
-        p->processor = this;
-        p->parameterIndex = i;
+        p->setOwner (&parameterListener);
+        p->setParameterIndex (i);
 
         validateParameter (p);
     }
@@ -579,8 +579,8 @@ void AudioProcessor::setParameterTree (AudioProcessorParameterGroup&& newTree)
     for (int i = 0; i < flatParameterList.size(); ++i)
     {
         auto p = flatParameterList.getUnchecked (i);
-        p->processor = this;
-        p->parameterIndex = i;
+        p->setOwner (&parameterListener);
+        p->setParameterIndex (i);
 
         validateParameter (p);
     }
@@ -590,7 +590,7 @@ void AudioProcessor::refreshParameterList() {}
 
 int AudioProcessor::getDefaultNumParameterSteps() noexcept
 {
-    return 0x7fffffff;
+    return AudioProcessorParameter::getDefaultNumParameterSteps();
 }
 
 void AudioProcessor::suspendProcessing (const bool shouldBeSuspended)
@@ -1410,7 +1410,7 @@ int AudioProcessor::getParameterNumSteps (int index)
     if (auto* p = getParameters()[index])
         return p->getNumSteps();
 
-    return AudioProcessor::getDefaultNumParameterSteps();
+    return getDefaultNumParameterSteps();
 }
 
 bool AudioProcessor::isParameterDiscrete (int index) const
@@ -1475,10 +1475,31 @@ AudioProcessorParameter* AudioProcessor::getParamChecked (int index) const
 bool AudioProcessor::canAddBus ([[maybe_unused]] bool isInput) const                     { return false; }
 bool AudioProcessor::canRemoveBus ([[maybe_unused]] bool isInput) const                  { return false; }
 
-JUCE_END_IGNORE_DEPRECATION_WARNINGS
-
 //==============================================================================
-void AudioProcessorListener::audioProcessorParameterChangeGestureBegin (AudioProcessor*, int) {}
-void AudioProcessorListener::audioProcessorParameterChangeGestureEnd   (AudioProcessor*, int) {}
+void AudioProcessor::ParameterChangeForwarder::parameterValueChanged (int index, float value)
+{
+    if (owner == nullptr)
+        return;
+
+    for (int i = owner->listeners.size(); --i >= 0;)
+        if (auto* l = owner->listeners[i])
+            l->audioProcessorParameterChanged (owner, index, value);
+}
+
+void AudioProcessor::ParameterChangeForwarder::parameterGestureChanged (int index, bool begin)
+{
+    if (owner == nullptr)
+        return;
+
+    const auto callback = begin
+                        ? &AudioProcessorListener::audioProcessorParameterChangeGestureBegin
+                        : &AudioProcessorListener::audioProcessorParameterChangeGestureEnd;
+
+    for (int i = owner->listeners.size(); --i >= 0;)
+        if (auto* l = owner->listeners[i])
+            (l->*callback) (owner, index);
+}
+
+JUCE_END_IGNORE_DEPRECATION_WARNINGS
 
 } // namespace juce
