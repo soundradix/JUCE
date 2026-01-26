@@ -44,14 +44,14 @@
 
   ID:                 juce_audio_processors_headless
   vendor:             juce
-  version:            8.0.8
+  version:            8.0.10
   name:               JUCE audio processor classes without UI
   description:        Classes for loading and playing VST, AU, LADSPA, or internally-generated audio processors without UI.
   website:            http://www.juce.com/juce
   license:            AGPLv3/Commercial
   minimumCppStandard: 17
 
-  dependencies:       juce_audio_basics, juce_graphics
+  dependencies:       juce_audio_basics juce_events
   OSXFrameworks:      CoreAudio CoreMIDI AudioToolbox
   iOSFrameworks:      AudioToolbox
 
@@ -64,7 +64,7 @@
 #define JUCE_AUDIO_PROCESSORS_HEADLESS_H_INCLUDED
 
 #include <juce_audio_basics/juce_audio_basics.h>
-#include <juce_graphics/juce_graphics.h>
+#include <juce_events/juce_events.h>
 
 #include <juce_audio_processors_headless/processors/juce_AudioProcessorListener.h>
 #include <juce_audio_processors_headless/utilities/juce_AAXClientExtensions.h>

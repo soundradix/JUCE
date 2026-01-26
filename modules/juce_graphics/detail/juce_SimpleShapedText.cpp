@@ -215,10 +215,11 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
                                                Range<int64> range,
                                                const Font& font,
                                                TextScript script,
-                                               const String& language,
                                                uint8_t embeddingLevel)
 {
-    HbBuffer buffer { hb_buffer_create() };
+    static const auto language = SystemStats::getDisplayLanguage();
+
+    HbBuffer buffer { hb_buffer_create(), IncrementRef::no };
     hb_buffer_clear_contents (buffer.get());
 
     hb_buffer_set_cluster_level (buffer.get(), HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
@@ -315,20 +316,14 @@ static std::vector<ShapedGlyph> lowLevelShape (Span<const juce_wchar> string,
         const auto xAdvanceBase = HbScale::hbToJuce (positions[visualIndex].x_advance);
         const auto yAdvanceBase = -HbScale::hbToJuce (positions[visualIndex].y_advance);
 
-        // For certain OS, Font and glyph ID combinations harfbuzz will not find extents data and
-        // hb_font_get_glyph_extents will return false. In such cases Typeface::getGlyphBounds
-        // will return an empty rectangle. Here we need to distinguish this situation from the one
-        // where extents information is available and is an empty rectangle, which indicates a
-        // whitespace.
-        const auto extentsDataAvailable = std::invoke ([&]
-        {
-            hb_glyph_extents_t extents{};
-            return hb_font_get_glyph_extents (font.getTypefacePtr()->getNativeDetails().getFont(),
-                                              (hb_codepoint_t) glyphId,
-                                              &extents);
-        });
+        // For certain OS, Font and glyph ID combinations harfbuzz will not find extents data.
+        // In such cases Typeface::getGlyphBounds will return an empty rectangle. Here we need
+        // to distinguish this situation from the one where extents information is available
+        // and is an empty rectangle, which indicates a whitespace.
+        const auto* native = font.getTypefacePtr()->getNativeDetails();
+        const auto extents = native->getGlyphExtents (glyphId);
 
-        const auto whitespace = extentsDataAvailable
+        const auto whitespace = extents.has_value()
                                 && font.getTypefacePtr()->getGlyphBounds (font.getMetricsKind(), (int) glyphId).isEmpty()
                                 && xAdvanceBase > 0;
 
@@ -515,7 +510,6 @@ private:
 struct ShapingParams
 {
     TextScript script;
-    String language;
     uint8_t embeddingLevel;
     Font resolvedFont;
 };
@@ -934,7 +928,6 @@ struct Shaper
                 {
                     shaperRuns.set (range,
                                     { scriptRun->front().script,
-                                      options.getLanguage(),
                                       *it,
                                       font },
                                     ops,
@@ -988,7 +981,6 @@ struct Shaper
                                         shapingRange,
                                         it->value.resolvedFont,
                                         it->value.script,
-                                        it->value.language,
                                         it->value.embeddingLevel);
 
                 shapedGlyphs.set (shapingRange,

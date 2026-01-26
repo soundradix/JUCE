@@ -1145,10 +1145,24 @@ private:
             return false;
         }
 
+        bool getPreviousTokenEndedWithSpace() const
+        {
+            return previousTokenEndedWithSpace;
+        }
+
+        void setPreviousTokenEndedWithSpace (bool endedWithSpace)
+        {
+            previousTokenEndedWithSpace = endedWithSpace;
+
+            if (parent != nullptr)
+                parent->setPreviousTokenEndedWithSpace (endedWithSpace);
+        }
+
     private:
         StringLayoutState* parent = nullptr;
         Point<float> nextStartingPos;
         Array<float> xCoords, yCoords;
+        bool previousTokenEndedWithSpace = false;
     };
 
     Drawable* parseText (const XmlPath& xml, bool shouldParseTransform,
@@ -1181,11 +1195,46 @@ private:
         auto dc = new DrawableComposite();
         setCommonAttributes (*dc, xml);
 
-        for (auto* e : xml->getChildIterator())
+        const auto children = xml->getChildIterator();
+
+        for (auto childIt = children.begin(); childIt != children.end(); ++childIt)
         {
+            const auto firstChild = childIt == children.begin();
+            const auto lastChild = std::next (childIt) == children.end();
+            auto* e = *childIt;
+
             if (e->isTextElement())
             {
-                auto fullText = e->getText();
+                auto fullText = e->getText().replace ("\r\n", " ").replace ("\n", " ");
+
+                if (layoutState.getPreviousTokenEndedWithSpace())
+                    fullText = fullText.trimStart();
+
+                if (xml->hasTagName ("text"))
+                {
+                    if (firstChild)
+                        fullText = fullText.trimStart();
+                    else if (lastChild)
+                        fullText = fullText.trimEnd();
+                }
+
+                const auto collapseSpaces = [] (const String& s)
+                {
+                    auto tokens = StringArray::fromTokens (s, false);
+                    tokens.removeEmptyStrings();
+                    auto collapsed = tokens.joinIntoString (" ");
+
+                    if (s.startsWithChar (' '))
+                        collapsed = " " + collapsed;
+
+                    if (s.endsWithChar (' '))
+                        collapsed += " ";
+
+                    return collapsed;
+                };
+
+                fullText = collapseSpaces (fullText);
+                layoutState.setPreviousTokenEndedWithSpace (fullText.endsWithChar (' '));
 
                 const auto subtextElements = [&]
                 {
@@ -1207,6 +1256,7 @@ private:
                     auto dt = new DrawableText();
                     dc->addAndMakeVisible (dt);
 
+                    dt->setPreserveWhitespace (true);
                     dt->setText (text);
                     dt->setFont (font, true);
 

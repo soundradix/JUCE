@@ -546,7 +546,7 @@ struct CoreMidiHelpers
         std::optional<EndpointInfo> getCachedInfo (const ump::EndpointId& x) const
         {
            #if JUCE_COREMIDI_UMP_ENDPOINT_CAN_BE_BUILT
-            if (@available (macos 15, ios 18, *))
+            if (@available (macOS 15, iOS 18, *))
                 if (const auto iter = virtualEndpoints.find (x); iter != virtualEndpoints.end())
                     return getInfoForEndpoint (iter->second);
            #endif
@@ -627,7 +627,7 @@ struct CoreMidiHelpers
         SharedEndpointsImplNative (MIDIClientRef c, ump::EndpointsListener& l)
             : client (c), listener (l)
         {
-            if (@available (macos 15.0, ios 18.0, *))
+            if (@available (macOS 15.0, iOS 18.0, *))
                 observers.emplace (*this);
         }
 
@@ -846,7 +846,7 @@ struct CoreMidiHelpers
         static std::map<ump::EndpointId, EndpointInfo> findNativeUMPEndpoints()
         {
            #if JUCE_COREMIDI_UMP_ENDPOINT_CAN_BE_BUILT
-            if (@available (macos 15, ios 18, *))
+            if (@available (macOS 15, iOS 18, *))
             {
                 std::map<ump::EndpointId, EndpointInfo> result;
 
@@ -867,7 +867,7 @@ struct CoreMidiHelpers
         static std::optional<SInt32> getUMPActiveGroupBitmap ([[maybe_unused]] MIDIEndpointRef r)
         {
            #if JUCE_MAC_API_VERSION_CAN_BE_BUILT (14, 0) || JUCE_IOS_API_VERSION_CAN_BE_BUILT (17, 0)
-            if (@available (macos 14, ios 17, *))
+            if (@available (macOS 14, iOS 17, *))
             {
                 SInt32 bitmap{};
 
@@ -884,7 +884,7 @@ struct CoreMidiHelpers
         static bool canTransmitGroupless ([[maybe_unused]] MIDIEndpointRef endpoint)
         {
            #if JUCE_MAC_API_VERSION_CAN_BE_BUILT (14, 0) || JUCE_IOS_API_VERSION_CAN_BE_BUILT (17, 0)
-            if (@available (macos 14, ios 17, *))
+            if (@available (macOS 14, iOS 17, *))
             {
                 SInt32 result;
                 if (MIDIObjectGetIntegerProperty (endpoint, kMIDIPropertyUMPCanTransmitGroupless, &result) == noErr)
@@ -1762,7 +1762,8 @@ struct CoreMidiHelpers
         }
 
         static std::shared_ptr<ConnectionToSrc> make (std::shared_ptr<SharedEndpointsImplNative> cachedEndpoints,
-                                                      ump::EndpointId id)
+                                                      ump::EndpointId id,
+                                                      ump::PacketProtocol protocol)
         {
             const auto endpoint = cachedEndpoints->getNativeEndpointForId (ump::IOKind::src, id);
 
@@ -1780,7 +1781,7 @@ struct CoreMidiHelpers
             auto receiver = rawToUniquePtr (new ConnectionToSrc (cachedEndpoints));
 
             MIDIPortRef port;
-            const auto error = CreatorFunctionsToUse::createInputPort (ump::PacketProtocol::MIDI_2_0,
+            const auto error = CreatorFunctionsToUse::createInputPort (protocol,
                                                                        cachedEndpoints->getClient(),
                                                                        cfName.object,
                                                                        &receiver->receiver,
@@ -2048,12 +2049,12 @@ struct CoreMidiHelpers
               consumer (cb)
         {
             connection->addDisconnectionListener (disconnectListener);
-            connection->addConsumer (consumer);
+            connection->addConsumer (*this);
         }
 
         ~InputImplNative() override
         {
-            connection->removeConsumer (consumer);
+            connection->removeConsumer (*this);
             connection->removeDisconnectionListener (disconnectListener);
         }
 
@@ -2361,7 +2362,7 @@ struct CoreMidiHelpers
                                                                 ump::PacketProtocol p,
                                                                 ump::Consumer& c) override
         {
-            if (auto src = findOrMakeSrc (id))
+            if (auto src = findOrMakeSrc (id, p))
                 return rawToUniquePtr (new InputImplNative { src, id, l, p, c });
 
             return {};
@@ -2384,7 +2385,7 @@ struct CoreMidiHelpers
                                                                                          [[maybe_unused]] ump::BlocksAreStatic areStatic) override
         {
            #if JUCE_COREMIDI_UMP_ENDPOINT_CAN_BE_BUILT
-            if (@available (macos 15, ios 18, *))
+            if (@available (macOS 15, iOS 18, *))
             {
                 auto connection = VirtualEndpointImplNative::make (cachedEndpoints,
                                                                    deviceName,
@@ -2396,7 +2397,8 @@ struct CoreMidiHelpers
 
                 if (connection != nullptr)
                 {
-                    connectionsSrc[connection->getId()] = connection->getSrc();
+                    connectionsSrc[{ connection->getId(), ump::PacketProtocol::MIDI_1_0 }] = connection->getSrc();
+                    connectionsSrc[{ connection->getId(), ump::PacketProtocol::MIDI_2_0 }] = connection->getSrc();
                     connectionsDst[connection->getId()] = connection->getDst();
                 }
 
@@ -2415,7 +2417,7 @@ struct CoreMidiHelpers
                 return {};
 
             auto result = LegacyVirtualEndpointImplNative::make (connection, id);
-            connectionsSrc[result->getId()] = connection;
+            connectionsSrc[{ result->getId(), ump::PacketProtocol::MIDI_1_0 }] = connection;
             return result;
         }
 
@@ -2440,14 +2442,14 @@ struct CoreMidiHelpers
         SessionImplNative (std::shared_ptr<SharedEndpointsImplNative> c, const String& n)
             : cachedEndpoints (c), name (n) {}
 
-        std::shared_ptr<ConnectionToSrc> findOrMakeSrc (const ump::EndpointId& id)
+        std::shared_ptr<ConnectionToSrc> findOrMakeSrc (const ump::EndpointId& id, ump::PacketProtocol protocol)
         {
-            auto& weak = connectionsSrc[id];
+            auto& weak = connectionsSrc[{ id, protocol }];
 
             if (auto strong = weak.lock())
                 return strong;
 
-            const auto strong = ConnectionToSrc::make (cachedEndpoints, id);
+            const auto strong = ConnectionToSrc::make (cachedEndpoints, id, protocol);
             weak = strong;
             return strong;
         }
@@ -2464,7 +2466,16 @@ struct CoreMidiHelpers
             return strong;
         }
 
-        std::map<ump::EndpointId, std::weak_ptr<ConnectionToSrc>> connectionsSrc;
+        struct SrcKey
+        {
+            ump::EndpointId id;
+            ump::PacketProtocol protocol;
+
+            auto tie() const { return std::tie (id, protocol); }
+            auto operator< (const SrcKey& other) const { return tie() < other.tie(); }
+        };
+
+        std::map<SrcKey, std::weak_ptr<ConnectionToSrc>> connectionsSrc;
         std::map<ump::EndpointId, std::weak_ptr<ConnectionToDst>> connectionsDst;
 
         std::shared_ptr<SharedEndpointsImplNative> cachedEndpoints;
@@ -2486,7 +2497,7 @@ struct CoreMidiHelpers
 
         bool isVirtualMidiUmpServiceActive() const override
         {
-            if (@available (macos 15, ios 18, *))
+            if (@available (macOS 15, iOS 18, *))
                 return true;
 
             return false;
