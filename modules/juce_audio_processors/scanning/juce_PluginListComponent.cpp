@@ -102,12 +102,17 @@ public:
         }
     }
 
-    void cellClicked (int rowNumber, int columnId, const juce::MouseEvent& e) override
+    void cellClicked (int rowNumber, int columnId, const MouseEvent& e) override
     {
         TableListBoxModel::cellClicked (rowNumber, columnId, e);
 
         if (rowNumber >= 0 && rowNumber < getNumRows() && e.mods.isPopupMenu())
-            owner.createMenuForRow (rowNumber).showMenuAsync (PopupMenu::Options().withDeletionCheck (owner));
+        {
+            owner.createMenuForRow (rowNumber)
+                 .showMenuAsync (PopupMenu::Options().withTargetComponent (e.originalComponent)
+                                                     .withMousePosition()
+                                                     .withDeletionCheck (owner));
+        }
     }
 
     void deleteKeyPressed (int) override
@@ -159,8 +164,8 @@ public:
           formatToScan (format),
           filesOrIdentifiersToScan (filesOrIdentifiers),
           propertiesToUse (properties),
-          pathChooserWindow (TRANS ("Select folders to scan..."), String(), MessageBoxIconType::NoIcon),
-          progressWindow (title, text, MessageBoxIconType::NoIcon),
+          pathChooserWindow (TRANS ("Select folders to scan..."), String(), MessageBoxIconType::NoIcon, &plc),
+          progressWindow (title, text, MessageBoxIconType::NoIcon, &plc),
           numThreads (threads),
           allowAsync (allowPluginsWhichRequireAsynchronousInstantiation)
     {
