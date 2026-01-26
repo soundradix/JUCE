@@ -820,27 +820,21 @@ AudioFormatReader* CoreAudioFormat::createReaderFor (InputStream* sourceStream,
     return nullptr;
 }
 
-AudioFormatWriter* CoreAudioFormat::createWriterFor (
-    OutputStream* output,
-    double sampleRateToUse,
-    unsigned int numberOfChannels,
-    int bitsPerSample,
-    const StringPairArray& /*metadataValues*/,
-    int /*qualityOptionIndex*/)
+std::unique_ptr<AudioFormatWriter> CoreAudioFormat::createWriterFor (std::unique_ptr<OutputStream>& output,
+                                                                     const AudioFormatWriterOptions& options)
 {
-    return new CoreAudioWriter (output, toAudioFileTypeID (streamKind), sampleRateToUse, numberOfChannels, (unsigned int) bitsPerSample);
+    return std::make_unique<CoreAudioWriter> (
+        output.release(),
+        toAudioFileTypeID (streamKind),
+        options.getSampleRate(),
+        options.getNumChannels(),
+        (unsigned int) options.getBitsPerSample());
 }
 
 void CoreAudioFormat::registerFormats (AudioFormatManager& formats)
 {
     for (int k = (int) StreamKind::kAiff; k <= (int) StreamKind::kAmr; ++k)
         formats.registerFormat (new CoreAudioFormat ((StreamKind) k), false);
-}
-std::unique_ptr<AudioFormatWriter> CoreAudioFormat::createWriterFor (std::unique_ptr<OutputStream>&,
-                                                                     const AudioFormatWriterOptions&)
-{
-    jassertfalse; // not yet implemented!
-    return nullptr;
 }
 
 
