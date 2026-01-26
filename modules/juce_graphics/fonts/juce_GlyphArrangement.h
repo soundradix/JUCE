@@ -125,6 +125,8 @@ private:
 class JUCE_API  GlyphArrangement  final
 {
 public:
+    using Options = GlyphArrangementOptions;
+
     //==============================================================================
     /** Creates an empty arrangement. */
     GlyphArrangement();
@@ -224,7 +226,8 @@ public:
                         float x, float y, float width, float height,
                         Justification layout,
                         int maximumLinesToUse,
-                        float minimumHorizontalScale = 0.0f);
+                        float minimumHorizontalScale = 0.0f,
+                        GlyphArrangementOptions options = {});
 
     /** Appends another glyph arrangement to this one. */
     void addGlyphArrangement (const GlyphArrangement&);
