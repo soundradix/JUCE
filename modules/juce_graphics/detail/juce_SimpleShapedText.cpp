@@ -32,190 +32,10 @@
   ==============================================================================
 */
 
-namespace juce
+namespace juce::detail
 {
-
-using FontForRange = std::pair<Range<int64>, Font>;
-
-class ShapedTextOptions
-{
-public:
-    [[nodiscard]] ShapedTextOptions withJustification (Justification x) const
-    {
-        return withMember (*this, &ShapedTextOptions::justification, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withMaxWidth (float x) const
-    {
-        return withMember (*this, &ShapedTextOptions::maxWidth, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withHeight (float x) const
-    {
-        return withMember (*this, &ShapedTextOptions::height, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withFont (Font x) const
-    {
-        return withMember (*this, &ShapedTextOptions::fontsForRange,
-                           std::vector<FontForRange> { { { 0, std::numeric_limits<int64>::max() },
-                                                         x } });
-    }
-
-    [[nodiscard]] ShapedTextOptions withFontsForRange (const std::vector<FontForRange>& x) const
-    {
-        return withMember (*this, &ShapedTextOptions::fontsForRange, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withLanguage (StringRef x) const
-    {
-        return withMember (*this, &ShapedTextOptions::language, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withFirstLineIndent (float x) const
-    {
-        return withMember (*this, &ShapedTextOptions::firstLineIndent, x);
-    }
-
-    /*  This controls the space between lines using a proportional value, with a default of 1.0,
-        meaning single line spacing i.e. the descender of the current line + ascender of the next
-        line. This value is multiplied by the leading provided here.
-    */
-    [[nodiscard]] ShapedTextOptions withLeading (float x) const
-    {
-        return withMember (*this, &ShapedTextOptions::leading, x);
-    }
-
-    /*  This controls the space between lines using an additive absolute value, with a default of 0.0.
-        This value is added to the spacing between each two lines.
-    */
-    [[nodiscard]] ShapedTextOptions withAdditiveLineSpacing (float x) const
-    {
-        return withMember (*this, &ShapedTextOptions::additiveLineSpacing, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withBaselineAtZero (bool x = true) const
-    {
-        return withMember (*this, &ShapedTextOptions::baselineAtZero, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withTrailingWhitespacesShouldFit (bool x = true) const
-    {
-        return withMember (*this, &ShapedTextOptions::trailingWhitespacesShouldFit, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withMaxNumLines (int64 x) const
-    {
-        return withMember (*this, &ShapedTextOptions::maxNumLines, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withEllipsis (String x = String::charToString ((juce_wchar) 0x2026)) const
-    {
-        return withMember (*this, &ShapedTextOptions::ellipsis, std::move (x));
-    }
-
-    [[nodiscard]] ShapedTextOptions withReadingDirection (std::optional<TextDirection> x) const
-    {
-        return withMember (*this, &ShapedTextOptions::readingDir, x);
-    }
-
-    [[nodiscard]] ShapedTextOptions withAllowBreakingInsideWord (bool x = true) const
-    {
-        return withMember (*this, &ShapedTextOptions::allowBreakingInsideWord, x);
-    }
-
-    const auto& getReadingDirection() const             { return readingDir; }
-    const auto& getJustification() const                { return justification; }
-    const auto& getMaxWidth() const                     { return maxWidth; }
-    const auto& getHeight() const                       { return height; }
-    const auto& getFontsForRange() const                { return fontsForRange; }
-    const auto& getLanguage() const                     { return language; }
-    const auto& getFirstLineIndent() const              { return firstLineIndent; }
-    const auto& getLeading() const                      { return leading; }
-    const auto& getAdditiveLineSpacing() const          { return additiveLineSpacing; }
-    const auto& isBaselineAtZero() const                { return baselineAtZero; }
-    const auto& getTrailingWhitespacesShouldFit() const { return trailingWhitespacesShouldFit; }
-    const auto& getMaxNumLines() const                  { return maxNumLines; }
-    const auto& getEllipsis() const                     { return ellipsis; }
-    const auto& getAllowBreakingInsideWord() const      { return allowBreakingInsideWord; }
-
-private:
-    Justification justification { Justification::topLeft };
-    std::optional<TextDirection> readingDir;
-    std::optional<float> maxWidth;
-    std::optional<float> height;
-    std::vector<FontForRange> fontsForRange { { { 0, std::numeric_limits<int64>::max() },
-                                                FontOptions { 15.0f } } };
-    String language = SystemStats::getDisplayLanguage();
-    float firstLineIndent = 0.0f;
-    float leading = 1.0f;
-    float additiveLineSpacing = 0.0f;
-    bool baselineAtZero = false;
-    bool allowBreakingInsideWord = false;
-    bool trailingWhitespacesShouldFit;
-    int64 maxNumLines = std::numeric_limits<int64>::max();
-    String ellipsis;
-};
-
-struct ShapedGlyph
-{
-    uint32_t glyphId;
-    int64 cluster;
-    bool unsafeToBreak;
-    bool whitespace;
-    Point<float> advance;
-    Point<float> offset;
-};
-
-struct GlyphLookupEntry
-{
-    Range<int64> glyphRange;
-    bool ltr = true;
-};
-
-class SimpleShapedText
-{
-public:
-    /*  Shapes and lays out the first contiguous sequence of ranges specified in the fonts
-        parameter.
-    */
-    SimpleShapedText (const String* data,
-                      const ShapedTextOptions& options);
-
-    /*  The returned container associates line numbers with the range of glyphs (not input codepoints)
-        that make up the line.
-    */
-    const auto& getLineNumbers() const { return lineNumbers; }
-
-    const auto& getResolvedFonts() const { return resolvedFonts; }
-
-    Range<int64> getTextRange (int64 glyphIndex) const;
-
-    int64 getNumLines() const { return (int64) lineNumbers.getRanges().size(); }
-    int64 getNumGlyphs() const { return (int64) glyphsInVisualOrder.size(); }
-
-    juce_wchar getCodepoint (int64 glyphIndex) const;
-
-    Span<const ShapedGlyph> getGlyphs (Range<int64> glyphRange) const;
-
-    Span<const ShapedGlyph> getGlyphs() const;
-
-private:
-    void shape (const String& data,
-                const ShapedTextOptions& options);
-
-    const String& string;
-    std::vector<ShapedGlyph> glyphsInVisualOrder;
-    detail::RangedValues<int64> lineNumbers;
-    detail::RangedValues<Font> resolvedFonts;
-    detail::RangedValues<GlyphLookupEntry> glyphLookup;
-
-    JUCE_LEAK_DETECTOR (SimpleShapedText)
-};
 
 //==============================================================================
-using namespace detail;
-
 constexpr hb_script_t getScriptTag (TextScript type)
 {
     JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wswitch-enum")
@@ -497,14 +317,28 @@ static std::vector<ShapedGlyph> lowLevelShape (const String& string,
     std::vector<size_t> characterLookup;
     std::vector<ShapedGlyph> glyphs;
 
-    std::optional<uint32_t> lastCluster;
+    std::optional<int64> lastCluster;
 
-    for (size_t i = 0; i < infos.size(); ++i)
+    const auto ltr = (embeddingLevel % 2) == 0;
+
+    const auto getNextCluster = [&ltr, &infosCapt = infos, &range] (size_t visualIndex)
     {
-        const auto j = (embeddingLevel % 2) == 0 ? i : infos.size() - 1 - i;
+        const auto next = (int64) visualIndex + (ltr ? 1 : -1);
 
-        const auto glyphId = infos[j].codepoint;
-        const auto xAdvance = positions[j].x_advance;
+        if (next < 0)
+            return ltr ? range.getStart() : range.getEnd();
+
+        if (next >= (int64) infosCapt.size())
+            return ltr ? range.getEnd() : range.getStart();
+
+        return (int64) infosCapt[(size_t) next].cluster + range.getStart();
+    };
+
+    for (size_t visualIndex = 0; visualIndex < infos.size(); ++visualIndex)
+    {
+        const auto glyphId = infos[visualIndex].codepoint;
+        const auto xAdvanceBase = HbScale::hbToJuce (positions[visualIndex].x_advance);
+        const auto yAdvanceBase = -HbScale::hbToJuce (positions[visualIndex].y_advance);
 
         // For certain OS, Font and glyph ID combinations harfbuzz will not find extents data and
         // hb_font_get_glyph_extents will return false. In such cases Typeface::getGlyphBounds
@@ -521,23 +355,67 @@ static std::vector<ShapedGlyph> lowLevelShape (const String& string,
 
         const auto whitespace = extentsDataAvailable
                                 && font.getTypefacePtr()->getGlyphBounds (font.getMetricsKind(), (int) glyphId).isEmpty()
-                                && xAdvance > 0;
+                                && xAdvanceBase > 0;
+
+        const auto newline = std::invoke ([&controlChars, &shapingInfos = infos, visualIndex]
+        {
+           const auto it = controlChars.find ((size_t) shapingInfos[visualIndex].cluster);
+
+           if (it == controlChars.end())
+               return false;
+
+           return it->second == ControlCharacter::cr || it->second == ControlCharacter::lf;
+        });
+
+        const auto cluster = (int64) infos[visualIndex].cluster + range.getStart();
+
+        const auto numLigaturePlaceholders = std::max ((int64) 0,
+                                                       std::abs (getNextCluster (visualIndex) - cluster) - 1);
 
         // Tracking is only applied at the beginning of a new cluster to avoid inserting it before
         // diacritic marks.
-        const auto appliedTracking = std::exchange (lastCluster, infos[j].cluster) != infos[j].cluster
+        const auto appliedTracking = std::exchange (lastCluster, cluster) != cluster
                                    ? trackingAmount
                                    : 0;
 
+        const auto advanceMultiplier = numLigaturePlaceholders == 0 ? 1.0f
+                                                                    : 1.0f / (float) (numLigaturePlaceholders + 1);
+
+        Point<float> advance { xAdvanceBase * advanceMultiplier + appliedTracking, yAdvanceBase * advanceMultiplier };
+
+        const auto ligatureClusterNumber = cluster + (ltr ? 0 : numLigaturePlaceholders);
+
         glyphs.push_back ({
             glyphId,
-            (int64) infos[j].cluster + range.getStart(),
-            (infos[j].mask & HB_GLYPH_FLAG_UNSAFE_TO_BREAK) != 0,
+            ligatureClusterNumber,
+            (infos[visualIndex].mask & HB_GLYPH_FLAG_UNSAFE_TO_BREAK) != 0,
             whitespace,
-            Point<float> { HbScale::hbToJuce (xAdvance) + appliedTracking, -HbScale::hbToJuce (positions[j].y_advance) },
-            Point<float> { HbScale::hbToJuce (positions[j].x_offset), -HbScale::hbToJuce (positions[j].y_offset) },
+            newline,
+            numLigaturePlaceholders == 0 ? (int8_t) 0 : (int8_t) -numLigaturePlaceholders ,
+            advance,
+            Point<float> { HbScale::hbToJuce (positions[visualIndex].x_offset),
+                           -HbScale::hbToJuce (positions[visualIndex].y_offset) },
         });
+
+        for (int l = 0; l < numLigaturePlaceholders; ++l)
+        {
+            const auto clusterDiff = l + 1;
+
+            glyphs.push_back ({
+                glyphId,
+                ligatureClusterNumber + (ltr ? clusterDiff : -clusterDiff),
+                true,
+                whitespace,
+                newline,
+                (int8_t) (l + 1),
+                advance,
+                Point<float>{},
+            });
+        }
     }
+
+    if (! ltr)
+        std::reverse (glyphs.begin(), glyphs.end());
 
     return glyphs;
 }
@@ -674,19 +552,24 @@ static auto makeSpan (T& array)
     return Span { array.getRawDataPointer(), (size_t) array.size() };
 }
 
-static std::vector<FontForRange> findSuitableFontsForText (const Font& font,
-                                                           const String& text,
-                                                           const String& language = {})
+static detail::RangedValues<Font> findSuitableFontsForText (const Font& font,
+                                                            const String& text,
+                                                            const String& language = {})
 {
     detail::RangedValues<std::optional<Font>> fonts;
-    fonts.set ({ 0, (int64) text.length() }, font);
+    detail::Ranges::Operations ops;
+    fonts.set ({ 0, (int64) text.length() }, font, ops);
+    ops.clear();
 
     const auto getResult = [&]
     {
-        std::vector<FontForRange> result;
+        detail::RangedValues<Font> result;
 
         for (const auto [r, v] : fonts)
-            result.emplace_back (r, v.value_or (font));
+        {
+            result.set (r, v.value_or (font), ops);
+            ops.clear();
+        }
 
         return result;
     };
@@ -711,7 +594,10 @@ static std::vector<FontForRange> findSuitableFontsForText (const Font& font,
         }
 
         for (const auto i : fontNotFound)
-            fonts.set ({ i, i + 1 }, std::nullopt);
+        {
+            fonts.set ({ i, i + 1 }, std::nullopt, ops);
+            ops.clear();
+        }
 
         return fontNotFound.size();
     };
@@ -720,7 +606,7 @@ static std::vector<FontForRange> findSuitableFontsForText (const Font& font,
     // can't find any more suitable fonts or all codepoints have one
     for (auto numMissingGlyphs = markMissingGlyphs(); numMissingGlyphs > 0;)
     {
-        std::vector<FontForRange> changes;
+        std::vector<std::pair<Range<int64>, Font>> changes;
 
         for (const auto [r, f] : fonts)
         {
@@ -733,7 +619,10 @@ static std::vector<FontForRange> findSuitableFontsForText (const Font& font,
         }
 
         for (const auto& c : changes)
-            fonts.set (c.first, c.second);
+        {
+            fonts.set (c.first, c.second, ops);
+            ops.clear();
+        }
 
         if (const auto newNumMissingGlyphs = markMissingGlyphs();
             std::exchange (numMissingGlyphs, newNumMissingGlyphs) == newNumMissingGlyphs)
@@ -749,16 +638,18 @@ static std::vector<FontForRange> findSuitableFontsForText (const Font& font,
 static RangedValues<Font> resolveFontsWithFallback (const String& string, const RangedValues<Font>& fonts)
 {
     RangedValues<Font> resolved;
+    detail::Ranges::Operations ops;
 
     for (const auto [r, f] : fonts)
     {
         auto rf = findSuitableFontsForText (f, string.substring ((int) r.getStart(),
                                                                  (int) std::min (r.getEnd(), (int64) string.length())));
 
-        for (auto& item : rf)
-            item.first += r.getStart();
-
-        resolved.setForEach<MergeEqualItems::no> (rf.begin(), rf.end());
+        for (const auto [subRange, font] : rf)
+        {
+            resolved.set (subRange + r.getStart(), font, ops, MergeEqualItemsNo{});
+            ops.clear();
+        }
     }
 
     return resolved;
@@ -805,6 +696,11 @@ public:
     auto isLtr()          const { return subOwnedGlyphsSpan.ltr; }
     auto getTextRange()   const { return textRange; }
     const auto& getFont() const { return subOwnedGlyphsSpan.font; }
+
+    void setTextRange (Range<int64> newRange)
+    {
+        textRange = newRange;
+    }
 
 private:
     GlyphsStorage subOwnedGlyphsSpan;
@@ -965,16 +861,13 @@ private:
 };
 
 template <typename T>
-static auto createRangedValues (const std::vector<std::pair<Range<int64>, T>>& pairs, int64 offset = 0)
+static auto rangedValuesWithOffset (detail::RangedValues<T> rv, int64 offset = 0)
 {
-    detail::RangedValues<T> result;
-
-    for (const auto& [range, value] : pairs)
-        result.insert (range.movedToStartAt (range.getStart() - offset), value);
-
-    result.eraseUpTo (0);
-
-    return result;
+    detail::Ranges::Operations ops;
+    rv.shift (std::numeric_limits<int64>::min(), -offset, ops);
+    ops.clear();
+    rv.eraseUpTo (0, ops);
+    return rv;
 }
 
 struct Shaper
@@ -999,8 +892,10 @@ struct Shaper
         const auto bidiLevels = bidiParagraph.getResolvedLevels();
 
         const auto fonts = resolveFontsWithFallback (string,
-                                                     createRangedValues (options.getFontsForRange(),
-                                                                         shapingRange.getStart()));
+                                                     rangedValuesWithOffset (options.getFontsForRange(),
+                                                                             shapingRange.getStart()));
+
+        detail::Ranges::Operations ops;
 
         for (Unicode::LineBreakIterator lineIter { makeSpan (analysis) }; auto lineRun = lineIter.next();)
         {
@@ -1019,13 +914,16 @@ struct Shaper
                     const auto bidiLength = (int64) std::distance (it, next);
                     const auto bidiRange = Range<int64>::withStartAndLength (bidiStart, bidiLength);
 
-                    for (const auto& [range, font] : fonts.getIntersectionsWith (bidiRange))
+                    for (const auto [range, font] : fonts.getIntersectionsWith (bidiRange))
                     {
-                        shaperRuns.set<MergeEqualItems::no> (range,
-                                                             { scriptRun->front().script,
-                                                               options.getLanguage(),
-                                                               *it,
-                                                               font });
+                        shaperRuns.set (range,
+                                        { scriptRun->front().script,
+                                          options.getLanguage(),
+                                          *it,
+                                          font },
+                                        ops,
+                                        MergeEqualItemsNo{});
+                        ops.clear();
                     }
 
                     it = next;
@@ -1060,6 +958,8 @@ struct Shaper
                                                           return *it;
                                                       });
 
+        detail::Ranges::Operations ops;
+
         if (! shapedGlyphs.getRanges().covers ({ startFrom, nextSoftBreakBefore }))
         {
             for (auto it = shaperRuns.find (startFrom);
@@ -1076,12 +976,15 @@ struct Shaper
                                         it->value.language,
                                         it->value.embeddingLevel);
 
-                shapedGlyphs.set<MergeEqualItems::no> (shapingRange,
-                                                       {
-                                                           std::make_shared<std::vector<ShapedGlyph>> (std::move (g)),
-                                                           it->value.embeddingLevel % 2 == 0,
-                                                           it->value.resolvedFont
-                                                       });
+                shapedGlyphs.set (shapingRange,
+                                  {
+                                      std::make_shared<std::vector<ShapedGlyph>> (std::move (g)),
+                                      it->value.embeddingLevel % 2 == 0,
+                                      it->value.resolvedFont
+                                  },
+                                  ops,
+                                  MergeEqualItemsNo{});
+                ops.clear();
             }
         }
 
@@ -1107,9 +1010,14 @@ struct Shaper
             while (end < endIt && end->cluster < nextSoftBreakBefore)
                 ++end;
 
+            const auto startingCluster = std::max (startFrom, start->cluster);
+
+            if (! result.empty())
+                result.back().setTextRange (result.back().getTextRange().withEnd (startingCluster));
+
             result.push_back ({ glyphsIt->value,
                                 Span<const ShapedGlyph> { start, (size_t) std::distance (start, end) },
-                                { startFrom, nextSoftBreakBefore },
+                                { startingCluster, nextSoftBreakBefore },
                                 visualOrder[(size_t) start->cluster] });
 
             if (end != endIt && end->cluster >= nextSoftBreakBefore)
@@ -1196,7 +1104,7 @@ public:
                                                 return nextState.isEmpty()
                                                        || glyph.advance.getX() <= remainingWidth
                                                        || (nextState.trailingWhitespaceCanExtendBeyondMargin
-                                                           && glyph.whitespace
+                                                           && glyph.isWhitespace()
                                                            && nextState.isInTrailingPosition (glyph));
                                             });
 
@@ -1356,6 +1264,8 @@ static void foldLinesBeyondLineLimit (std::vector<std::vector<WrappedGlyphsCurso
 void SimpleShapedText::shape (const String& data,
                               const ShapedTextOptions& options)
 {
+    detail::Ranges::Operations ops;
+
     for (const auto& lineRange : getLineRanges (data))
     {
         Shaper shaper { data, lineRange, options };
@@ -1366,9 +1276,9 @@ void SimpleShapedText::shape (const String& data,
                                                     .fillLines (shaper);
         auto& lineData = lineDataAndStorage.lines;
 
-        foldLinesBeyondLineLimit (lineData, (size_t) options.getMaxNumLines() - lineNumbers.size());
+        foldLinesBeyondLineLimit (lineData, (size_t) options.getMaxNumLines() - lineNumbersForGlyphRanges.size());
 
-        if (lineNumbers.size() >= (size_t) options.getMaxNumLines())
+        if (lineNumbersForGlyphRanges.size() >= (size_t) options.getMaxNumLines())
             break;
 
         for (const auto& line : lineData)
@@ -1400,12 +1310,30 @@ void SimpleShapedText::shape (const String& data,
                 for (auto i = start; i < end; ++i)
                     glyphsInVisualOrder[(size_t) i].cluster += lineRange.getStart();
 
-                glyphLookup.set<MergeEqualItems::no> (s.textRange + lineRange.getStart(), { { start, end }, ltr });
-                resolvedFonts.set ({ start, end }, s.font);
+                glyphLookup.set (s.textRange + lineRange.getStart(), { { start, end }, ltr }, ops, MergeEqualItemsNo{});
+                ops.clear();
+                resolvedFonts.set ({ start, end }, s.font, ops);
+                ops.clear();
             }
 
+            const auto lineTextRange = std::accumulate (glyphSpansInLine.begin(),
+                                                        glyphSpansInLine.end(),
+                                                        std::make_pair (std::numeric_limits<int64>::max(),
+                                                                        std::numeric_limits<int64>::min()),
+                                                        [&] (auto sum, auto& elem) -> std::pair<int64, int64>
+                                                        {
+                                                            const auto r = elem.textRange + lineRange.getStart();
+
+                                                            return { std::min (sum.first, r.getStart()),
+                                                                     std::max (sum.second, r.getEnd()) };
+                                                        });
+
+            lineTextRanges.set ({ lineTextRange.first, lineTextRange.second }, ops);
+            ops.clear();
+
             const auto lineEnd = (int64) glyphsInVisualOrder.size();
-            lineNumbers.set ({ lineStart, lineEnd}, (int64) lineNumbers.size());
+            lineNumbersForGlyphRanges.set ({ lineStart, lineEnd}, (int64) lineNumbersForGlyphRanges.size(), ops);
+            ops.clear();
         }
     }
 }
@@ -1471,6 +1399,115 @@ Range<int64> SimpleShapedText::getTextRange (int64 glyphIndex) const
     }();
 
     return Range<int64>::withStartAndLength (cluster, std::max ((int64) 1, nextAdjacentCluster - cluster));
+}
+
+bool SimpleShapedText::isLtr (int64 glyphIndex) const
+{
+    const auto it = glyphLookup.find (glyphsInVisualOrder[(size_t) glyphIndex].cluster);
+    jassert (it != glyphLookup.end());
+    return it->value.ltr;
+}
+
+/*  Returns the first element that equals value, if such an element exists.
+
+    Otherwise, returns the last element that is smaller than value, if such an element exists.
+
+    Returns end otherwise.
+
+
+    NB: lower_bound:     equal or greater
+        upper_bound:     greater
+        lessThanOrEqual: less than or equal
+*/
+template <typename It, typename Value, typename Callback>
+auto equalOrLessThan (It begin, It end, Value v, Callback extractValue)
+{
+    if (begin == end)
+        return end;
+
+    auto it = std::lower_bound (begin,
+                                end,
+                                v,
+                                [&extractValue] (auto& elem, auto& value)
+                                {
+                                    return extractValue (elem) < value;
+                                });
+
+    if (it == begin || (it != end && extractValue (*it) == v))
+        return it;
+
+    --it;
+
+    return it;
+}
+
+void SimpleShapedText::getGlyphRanges (Range<int64> textRange, std::vector<Range<int64>>& outRanges) const
+{
+    outRanges.clear();
+    Ranges glyphRanges { std::move (outRanges) };
+    detail::Ranges::Operations ops;
+
+    for (const auto is : glyphLookup.getIntersectionsWith (textRange))
+    {
+        const auto textSubRange = is.range;
+        const auto glyphsSubRange = is.value.glyphRange;
+        const auto& subRangeLookup = is.value;
+        const auto glyphs = getGlyphs (glyphsSubRange);
+
+        const auto getGlyphSubRange = [&] (auto begin, auto end)
+        {
+            auto startIt = equalOrLessThan (begin,
+                                            end,
+                                            textSubRange.getStart(),
+                                            [] (auto& elem) -> auto& { return elem.cluster; });
+
+            auto endIt = std::lower_bound (begin,
+                                           end,
+                                           textSubRange.getEnd(),
+                                           [] (auto& elem, auto& value) { return elem.cluster < value; });
+
+            return Range<int64> { (int64) std::distance (begin, startIt), std::distance (begin, endIt) };
+        };
+
+        if (subRangeLookup.ltr)
+        {
+            glyphRanges.set (getGlyphSubRange (glyphs.begin(), glyphs.end()) + glyphsSubRange.getStart(), ops);
+        }
+        else
+        {
+            const auto reverseRange = getGlyphSubRange (std::reverse_iterator { glyphs.end() },
+                                                        std::reverse_iterator { glyphs.begin() });
+
+            glyphRanges.set ({ glyphsSubRange.getEnd() - reverseRange.getEnd(),
+                               glyphsSubRange.getEnd() - reverseRange.getStart() },
+                             ops);
+        }
+
+        ops.clear();
+    }
+
+    outRanges = std::move (glyphRanges.getRanges());
+}
+
+int64 SimpleShapedText::getTextIndexAfterGlyph (int64 glyphIndex) const
+{
+    const auto& cluster = glyphsInVisualOrder[(size_t) glyphIndex].cluster;
+    auto it = glyphLookup.find (glyphsInVisualOrder[(size_t) glyphIndex].cluster);
+
+    if (it->value.ltr)
+    {
+        for (auto i = glyphIndex + 1; i < it->value.glyphRange.getEnd(); ++i)
+            if (const auto nextCluster = glyphsInVisualOrder[(size_t) i].cluster; nextCluster != cluster)
+                return nextCluster;
+    }
+    else
+    {
+        for (auto i = glyphIndex - 1; i >= it->value.glyphRange.getStart(); --i)
+            if (const auto nextCluster = glyphsInVisualOrder[(size_t) i].cluster; nextCluster != cluster)
+                return nextCluster;
+    }
+
+    return it->range.getEnd();
 }
 
 #if JUCE_UNIT_TESTS
@@ -1541,4 +1578,4 @@ static SimpleShapedTextTests simpleShapedTextTests;
 
 #endif
 
-} // namespace juce
+} // namespace juce::detail
