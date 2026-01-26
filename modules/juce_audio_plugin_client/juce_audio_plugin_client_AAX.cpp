@@ -41,7 +41,7 @@
 #include <juce_audio_plugin_client/detail/juce_PluginUtilities.h>
 #include <juce_gui_basics/native/juce_WindowsHooks_windows.h>
 
-#include <juce_audio_processors/format_types/juce_LegacyAudioParameter.cpp>
+#include <juce_audio_processors_headless/format_types/juce_LegacyAudioParameter.h>
 
 #if JucePlugin_EnhancedAudioSuite
  #include <juce_audio_formats/format/juce_AudioFormatReader.h>
