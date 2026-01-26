@@ -99,16 +99,15 @@ public:
                 << "\"New\": \"" << VST3::UID { newId }.toString() << "\", "
                 << "\"Old\": [";
 
-            for (int i = 0; i < oldIds.size(); ++i)
+            for (size_t i = 0; i < oldIds.size(); ++i)
             {
                 str << "\""
                     << std::hex
-                    << std::setw (2)
                     << std::setfill ('0')
                     << std::uppercase;
 
                 for (auto byte : oldIds[i])
-                    str << (int) byte;
+                    str << std::setw (2) << (int) byte;
 
                 str.clear();
                 str << "\"";
