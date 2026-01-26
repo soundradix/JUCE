@@ -4,6 +4,62 @@
 
 ## Change
 
+The default Visual Studio project settings for "Debug Information Format" have
+changed in the Projucer. By default debug symbols are generated using the /Zi
+flag.
+
+**Possible Issues**
+
+PDB file generation may change depending on the combination of "Debug
+Information Format" settings.
+
+**Workaround**
+
+Change the "Debug Information Format" setting for each Visual Studio
+configuration as required.
+
+**Rationale**
+
+The previous change to "/Z7" for the "Debug Information Format" flag caused
+build artefacts to drastically increase in size in some configurations, which
+could lead to build failures. In particular, when link-time code-generation is
+enabled, .obj files generated with the debug info mode set to "Z7" or "None"
+may be much larger than when using "Zi" instead.
+
+
+## Change
+
+The "Debug Information Format" flag has been changed to "/Zi" from "/Z7" when
+building JUCE on Windows using CMake.
+
+**Possible Issues**
+
+Some CI tooling (e.g., sscache) may experience issues writing debug information.
+Debug information will no longer be stored inside the object files during the
+build process.
+
+**Workaround**
+
+You can override the "Debug Information Format" flag with the
+"CMAKE_MSVC_DEBUG_INFORMATION_FORMAT" which is available under policy "CMP0141".
+
+This can be enabled at configuration time:
+    -DCMAKE_POLICY_DEFAULT_CMP0141=NEW
+    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded (for "/Z7")
+    or
+    -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=ProgramDatabase (for "/Zi")
+
+**Rationale**
+
+The previous change to "/Z7" for the "Debug Information Format" flag caused
+build artefacts to drastically increase in size in some configurations, which
+could lead to build failures. In particular, when link-time code-generation is
+enabled, .obj files generated with the debug info mode set to "Z7" or "None"
+may be much larger than when using "Zi" instead.
+
+
+## Change
+
 The AudioFormat class now only has one virtual createWriterFor member function:
 `createWriterFor (std::unique_ptr<OutputStream>&, const AudioFormatWriterOptions&)`.
 
