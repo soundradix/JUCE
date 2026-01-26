@@ -1854,6 +1854,8 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
             clip->renderImageUntransformed (*this, finishedLayerState.transparencyLayer,
                                             (int) (finishedLayerState.transparencyLayerAlpha * 255.0f),
                                             clipBounds.getX(), clipBounds.getY(), false);
+
+            state->activeTextures.bindTexture (state->shaderQuadQueue, 0);
         }
     }
 
