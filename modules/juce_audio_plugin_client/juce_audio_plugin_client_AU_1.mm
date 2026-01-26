@@ -1604,12 +1604,12 @@ public:
 
         for (uint32_t i = 0; i < list->numPackets; ++i)
         {
-            toBytestreamDispatcher.dispatch (reinterpret_cast<const uint32_t*> (packet->words),
-                                             reinterpret_cast<const uint32_t*> (packet->words + packet->wordCount),
+            toBytestreamDispatcher.dispatch ({ reinterpret_cast<const uint32_t*> (packet->words),
+                                               (size_t) packet->wordCount },
                                              static_cast<double> (packet->timeStamp + inOffsetSampleFrame),
-                                             [this] (const ump::BytestreamMidiView& message)
+                                             [this] (const ump::BytesOnGroup& x, double t)
                                              {
-                                                 incomingEvents.addEvent (message.getMessage(), (int) message.timestamp);
+                                                 incomingEvents.addEvent ({ x.bytes.data(), (int) x.bytes.size(), t }, (int) t);
                                              });
 
             packet = MIDIEventPacketNext (packet);

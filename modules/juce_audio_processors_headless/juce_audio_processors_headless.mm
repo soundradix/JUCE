@@ -32,22 +32,4 @@
   ==============================================================================
 */
 
-/** @cond */
-namespace juce::universal_midi_packets
-{
-
-/**
-    A base class for classes which receive Universal MIDI Packets from an input.
-
-    @tags{Audio}
-*/
-struct Receiver
-{
-    virtual ~Receiver() noexcept = default;
-
-    /** This will be called each time a new packet is ready for processing. */
-    virtual void packetReceived (const View& packet, double time) = 0;
-};
-
-} // namespace juce::universal_midi_packets
-/** @endcond */
+#include "juce_audio_processors_headless.cpp"
