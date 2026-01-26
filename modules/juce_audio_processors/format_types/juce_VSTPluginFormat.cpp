@@ -32,7 +32,7 @@
   ==============================================================================
 */
 
-#if (JUCE_PLUGINHOST_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX)) || DOXYGEN
+#if (JUCE_INTERNAL_HAS_VST && (JUCE_MAC || JUCE_WINDOWS || JUCE_LINUX)) || DOXYGEN
 
 #include <juce_audio_processors_headless/format_types/juce_VSTPluginFormatImpl.h>
 #include <juce_audio_processors/utilities/juce_NSViewComponentWithParent.h>
