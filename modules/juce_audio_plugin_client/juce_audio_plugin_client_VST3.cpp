@@ -1153,7 +1153,7 @@ public:
                 uint8 g = (channelColour >> 8) & 0x000000FF;
                 uint8 b = (channelColour >> 16) & 0x000000FF;
                 uint8 a = (channelColour >> 24) & 0x000000FF;
-                trackProperties.colour = Colour (r, g, b, a);
+                trackProperties.colourARGB = Colour (r, g, b, a).getARGB();
                 hasUsableContextInfoChange = true;
             }
 
