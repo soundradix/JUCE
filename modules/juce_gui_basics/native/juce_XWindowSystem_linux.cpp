@@ -578,6 +578,116 @@ enum
     KeyPressEventType = 2
 };
 
+//=============================== X11 - XInput =================================
+#if JUCE_USE_XINPUT
+ namespace XInputHelpers
+ {
+     static MultiTouchMapper<int> currentTouches;
+
+     static std::optional<int> setupXI2 (::Display* display)
+     {
+         static const auto result = std::invoke ([display]() -> std::optional<int>
+         {
+             int xinputOpcode, first_event, first_error;
+             if (! X11Symbols::getInstance()->xQueryExtension (display, "XInputExtension", &xinputOpcode, &first_event, &first_error))
+                 return {};
+
+             int major = 2, minor = 2;
+             if (X11Symbols::getInstance()->xiQueryVersion (display, &major, &minor) != Success)
+                return {};
+
+             if (std::tuple (major, minor) < std::tuple (2, 2))
+                 return {};
+
+             unsigned char maskData[XIMaskLen (XI_LASTEVENT)] = {};
+             XISetMask (maskData, XI_HierarchyChanged);
+
+             XIEventMask eventMask;
+             eventMask.deviceid = XIAllDevices;
+             eventMask.mask_len = sizeof (maskData);
+             eventMask.mask = maskData;
+
+             X11Symbols::getInstance()->xiSelectEvents (display,
+                                                        X11Symbols::getInstance()->xDefaultRootWindow (display),
+                                                        &eventMask,
+                                                        1);
+             X11Symbols::getInstance()->xFlush (display);
+
+             return xinputOpcode;
+         });
+
+         return result;
+     }
+
+     static void registerForXI2Events (::Display* display, ::Window windowH)
+     {
+         if (! setupXI2 (display))
+             return;
+
+         const auto shouldHandleMouseClicks = std::invoke ([windowH]
+         {
+             if (auto* peer = getPeerFor (windowH))
+                 return (peer->getStyleFlags() & ComponentPeer::windowIgnoresMouseClicks) == 0;
+
+             return true;
+         });
+
+         int numDevices = 0;
+         auto* info = X11Symbols::getInstance()->xiQueryDevice (display, XIAllDevices, &numDevices);
+         const ScopeGuard scope { [info] { X11Symbols::getInstance()->xiFreeDeviceInfo (info); } };
+
+         for (auto& deviceInfo : makeRange (info, info + numDevices))
+         {
+             if (deviceInfo.use != XISlavePointer)
+                continue;
+
+             unsigned char maskData[XIMaskLen (XI_LASTEVENT)] = {};
+
+             if (shouldHandleMouseClicks)
+             {
+                 const auto isTouchCapable = std::any_of (deviceInfo.classes,
+                                                          deviceInfo.classes + deviceInfo.num_classes,
+                                                          [] (const auto& x) { return x->type == XITouchClass; });
+
+                 if (isTouchCapable)
+                 {
+                    XISetMask (maskData, XI_TouchBegin);
+                    XISetMask (maskData, XI_TouchUpdate);
+                    XISetMask (maskData, XI_TouchEnd);
+                 }
+             }
+
+             const auto isButtonCapable = std::any_of (deviceInfo.classes,
+                                                       deviceInfo.classes + deviceInfo.num_classes,
+                                                       [] (const auto& x) { return x->type == XIButtonClass; });
+
+             if (isButtonCapable)
+             {
+                 XISetMask (maskData, XI_Motion);
+
+                 if (shouldHandleMouseClicks)
+                 {
+                    XISetMask (maskData, XI_ButtonPress);
+                    XISetMask (maskData, XI_ButtonRelease);
+                 }
+             }
+
+             XIEventMask eventMask;
+             eventMask.deviceid = deviceInfo.deviceid;
+             eventMask.mask_len = sizeof (maskData);
+             eventMask.mask = maskData;
+
+             X11Symbols::getInstance()->xiSelectEvents (display,
+                                                        windowH,
+                                                        &eventMask,
+                                                        1);
+         }
+
+         X11Symbols::getInstance()->xFlush (display);
+     }
+ }
+#endif
+
 //================================== X11 - Shm =================================
 #if JUCE_USE_XSHM
  namespace XSHMHelpers
@@ -1509,7 +1619,7 @@ static int getAllEventsMask (bool ignoresMouseClicks)
              | (ignoresMouseClicks ? 0 : (ButtonPressMask | ButtonReleaseMask));
 }
 
-::Window XWindowSystem::createWindow (::Window parentToAddTo, LinuxComponentPeer* peer) const
+::Window XWindowSystem::createWindow (::Window parentToAddTo, LinuxComponentPeer* peer)
 {
     if (! xIsAvailable)
     {
@@ -1604,11 +1714,23 @@ static int getAllEventsMask (bool ignoresMouseClicks)
     unsigned long info[2] = { 0, 1 };
     xchangeProperty (windowH, atoms.XembedInfo, atoms.XembedInfo, 32, (unsigned char*) info, 2);
 
+    windowHandles.push_back (windowH);
+
+   #if JUCE_USE_XINPUT
+    XInputHelpers::registerForXI2Events (display, windowH);
+   #endif
+
     return windowH;
 }
 
 void XWindowSystem::destroyWindow (::Window windowH)
 {
+    if (auto it = std::find (windowHandles.begin(), windowHandles.end(), windowH);
+        it != windowHandles.end())
+    {
+        windowHandles.erase (it);
+    }
+
     auto* peer = dynamic_cast<LinuxComponentPeer*> (getPeerFor (windowH));
 
     if (peer == nullptr)
@@ -1643,6 +1765,10 @@ void XWindowSystem::destroyWindow (::Window windowH)
    #if JUCE_USE_XSHM
     if (XSHMHelpers::isShmAvailable (display))
         shmPaintsPendingMap.erase (windowH);
+   #endif
+
+   #if JUCE_USE_XINPUT
+    XInputHelpers::currentTouches.deleteAllTouchesForPeer (peer);
    #endif
 }
 
@@ -2146,6 +2272,15 @@ bool XWindowSystem::canUseARGBImages() const
    #endif
 
     return canUseARGB;
+}
+
+bool XWindowSystem::canUseMultiTouch() const
+{
+   #if JUCE_USE_XINPUT
+    return XInputHelpers::setupXI2 (display).has_value();
+   #endif
+
+    return false;
 }
 
 bool XWindowSystem::isDarkModeActive() const
@@ -3344,10 +3479,10 @@ void juce_deleteKeyProxyWindow (::Window keyProxy)
 }
 
 //==============================================================================
-template <typename EventType>
-static Point<float> getLogicalMousePos (const EventType& e, double scaleFactor) noexcept
+template <typename PosType>
+static Point<float> getLogicalMousePos (Point<PosType> pt, const LinuxComponentPeer& peer) noexcept
 {
-    return Point<float> ((float) e.x, (float) e.y) / scaleFactor;
+    return pt.toFloat() / peer.getPlatformScaleFactor();
 }
 
 static int64 getEventTime (::Time t)
@@ -3359,12 +3494,6 @@ static int64 getEventTime (::Time t)
         eventTimeOffset = Time::currentTimeMillis() - thisMessageTime;
 
     return eventTimeOffset + thisMessageTime;
-}
-
-template <typename EventType>
-static int64 getEventTime (const EventType& t)
-{
-    return getEventTime (t.time);
 }
 
 void XWindowSystem::handleWindowMessage (LinuxComponentPeer* peer, XEvent& event) const
@@ -3575,7 +3704,7 @@ void XWindowSystem::handleKeyReleaseEvent (LinuxComponentPeer* peer, const XKeyE
     }
 }
 
-void XWindowSystem::handleWheelEvent (LinuxComponentPeer* peer, const XButtonPressedEvent& buttonPressEvent, float amount) const
+void XWindowSystem::handleWheelEvent (LinuxComponentPeer* peer, int64 eventTime, Point<float> logicalMousePos, float amount) const
 {
     MouseWheelDetails wheel;
     wheel.deltaX = 0.0f;
@@ -3584,50 +3713,58 @@ void XWindowSystem::handleWheelEvent (LinuxComponentPeer* peer, const XButtonPre
     wheel.isSmooth = false;
     wheel.isInertial = false;
 
-    peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),
-                            getEventTime (buttonPressEvent), wheel);
+    peer->handleMouseWheel (MouseInputSource::InputSourceType::mouse, logicalMousePos, eventTime, wheel);
 }
 
-void XWindowSystem::handleButtonPressEvent (LinuxComponentPeer* peer, const XButtonPressedEvent& buttonPressEvent, int buttonModifierFlag) const
+void XWindowSystem::handleButtonPressEvent (LinuxComponentPeer* peer, int64 eventTime, Point<float> logicalMousePos, int buttonModifierFlag) const
 {
     ModifierKeys::currentModifiers = ModifierKeys::getCurrentModifiers().withFlags (buttonModifierFlag);
     peer->toFront (true);
-    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonPressEvent, peer->getPlatformScaleFactor()),
+    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, logicalMousePos,
                             ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure,
-                            MouseInputSource::defaultOrientation, getEventTime (buttonPressEvent), {});
+                            MouseInputSource::defaultOrientation, eventTime, {});
 }
 
-void XWindowSystem::handleButtonPressEvent (LinuxComponentPeer* peer, const XButtonPressedEvent& buttonPressEvent) const
+void XWindowSystem::handleButtonPressEvent (LinuxComponentPeer* peer, int state, int button, ::Time time, Point<double> pt) const
 {
-    updateKeyModifiers ((int) buttonPressEvent.state);
+    updateKeyModifiers (state);
 
-    auto mapIndex = (uint32) (buttonPressEvent.button - Button1);
+    auto mapIndex = (uint32) (button - Button1);
 
     if (mapIndex < (uint32) numElementsInArray (pointerMap))
     {
+        const auto eventTime = getEventTime (time);
+        const auto eventPos = getLogicalMousePos (pt, *peer);
+
         switch (pointerMap[mapIndex])
         {
-            case Keys::WheelUp:         handleWheelEvent (peer, buttonPressEvent,  50.0f / 256.0f); break;
-            case Keys::WheelDown:       handleWheelEvent (peer, buttonPressEvent, -50.0f / 256.0f); break;
-            case Keys::LeftButton:      handleButtonPressEvent (peer, buttonPressEvent, ModifierKeys::leftButtonModifier); break;
-            case Keys::RightButton:     handleButtonPressEvent (peer, buttonPressEvent, ModifierKeys::rightButtonModifier); break;
-            case Keys::MiddleButton:    handleButtonPressEvent (peer, buttonPressEvent, ModifierKeys::middleButtonModifier); break;
-            case Keys::BackButton:      handleButtonPressEvent (peer, buttonPressEvent, ModifierKeys::backButtonModifier); break;
-            case Keys::ForwardButton:   handleButtonPressEvent (peer, buttonPressEvent, ModifierKeys::forwardButtonModifier); break;
+            case Keys::WheelUp:         handleWheelEvent (peer, eventTime, eventPos,  50.0f / 256.0f); break;
+            case Keys::WheelDown:       handleWheelEvent (peer, eventTime, eventPos, -50.0f / 256.0f); break;
+            case Keys::LeftButton:      handleButtonPressEvent (peer, eventTime, eventPos, ModifierKeys::leftButtonModifier); break;
+            case Keys::RightButton:     handleButtonPressEvent (peer, eventTime, eventPos, ModifierKeys::rightButtonModifier); break;
+            case Keys::MiddleButton:    handleButtonPressEvent (peer, eventTime, eventPos, ModifierKeys::middleButtonModifier); break;
+            case Keys::BackButton:      handleButtonPressEvent (peer, eventTime, eventPos, ModifierKeys::backButtonModifier); break;
+            case Keys::ForwardButton:   handleButtonPressEvent (peer, eventTime, eventPos, ModifierKeys::forwardButtonModifier); break;
 
             default: break;
         }
     }
 }
 
-void XWindowSystem::handleButtonReleaseEvent (LinuxComponentPeer* peer, const XButtonReleasedEvent& buttonRelEvent) const
+void XWindowSystem::handleButtonPressEvent (LinuxComponentPeer* peer, const XButtonPressedEvent& buttonPressEvent) const
 {
-    updateKeyModifiers ((int) buttonRelEvent.state);
+    handleButtonPressEvent (peer, (int) buttonPressEvent.state, (int) buttonPressEvent.button, buttonPressEvent.time,
+                            Point { buttonPressEvent.x, buttonPressEvent.y }.toDouble());
+}
+
+void XWindowSystem::handleButtonReleaseEvent (LinuxComponentPeer* peer, int state, int button, ::Time time, Point<double> pt) const
+{
+    updateKeyModifiers (state);
 
     if (peer->getParentWindow() != 0)
         peer->updateWindowBounds();
 
-    auto mapIndex = (uint32) (buttonRelEvent.button - Button1);
+    auto mapIndex = (uint32) (button - Button1);
 
     if (mapIndex < (uint32) numElementsInArray (pointerMap))
     {
@@ -3648,13 +3785,19 @@ void XWindowSystem::handleButtonReleaseEvent (LinuxComponentPeer* peer, const XB
     if (dragState.isDragging())
         dragState.handleExternalDragButtonReleaseEvent();
 
-    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (buttonRelEvent, peer->getPlatformScaleFactor()),
-                            ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure, MouseInputSource::defaultOrientation, getEventTime (buttonRelEvent));
+    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (pt, *peer),
+                            ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure, MouseInputSource::defaultOrientation, getEventTime (time));
 }
 
-void XWindowSystem::handleMotionNotifyEvent (LinuxComponentPeer* peer, const XPointerMovedEvent& movedEvent) const
+void XWindowSystem::handleButtonReleaseEvent (LinuxComponentPeer* peer, const XButtonPressedEvent& buttonPressEvent) const
 {
-    updateKeyModifiers ((int) movedEvent.state);
+    handleButtonReleaseEvent (peer, (int) buttonPressEvent.state, (int) buttonPressEvent.button, buttonPressEvent.time,
+                              Point { buttonPressEvent.x, buttonPressEvent.y }.toDouble());
+}
+
+void XWindowSystem::handleMotionNotifyEvent (LinuxComponentPeer* peer, int state, ::Time time, Point<double> pt) const
+{
+    updateKeyModifiers (state);
     Keys::refreshStaleMouseKeys();
 
     auto& dragState = dragAndDropStateMap[peer];
@@ -3662,9 +3805,15 @@ void XWindowSystem::handleMotionNotifyEvent (LinuxComponentPeer* peer, const XPo
     if (dragState.isDragging())
         dragState.handleExternalDragMotionNotify();
 
-    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (movedEvent, peer->getPlatformScaleFactor()),
+    peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (pt, *peer),
                             ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure,
-                            MouseInputSource::defaultOrientation, getEventTime (movedEvent));
+                            MouseInputSource::defaultOrientation, getEventTime (time));
+}
+
+void XWindowSystem::handleMotionNotifyEvent (LinuxComponentPeer* peer, const XPointerMovedEvent& movedEvent) const
+{
+    handleMotionNotifyEvent (peer, (int) movedEvent.state, movedEvent.time,
+                             Point { movedEvent.x, movedEvent.y }.toDouble());
 }
 
 void XWindowSystem::handleEnterNotifyEvent (LinuxComponentPeer* peer, const XEnterWindowEvent& enterEvent) const
@@ -3675,9 +3824,9 @@ void XWindowSystem::handleEnterNotifyEvent (LinuxComponentPeer* peer, const XEnt
     if (! ModifierKeys::getCurrentModifiers().isAnyMouseButtonDown())
     {
         updateKeyModifiers ((int) enterEvent.state);
-        peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (enterEvent, peer->getPlatformScaleFactor()),
+        peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (Point { enterEvent.x, enterEvent.y }, *peer),
                                 ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure,
-                                MouseInputSource::defaultOrientation, getEventTime (enterEvent));
+                                MouseInputSource::defaultOrientation, getEventTime (enterEvent.time));
     }
 }
 
@@ -3690,9 +3839,9 @@ void XWindowSystem::handleLeaveNotifyEvent (LinuxComponentPeer* peer, const XLea
          || leaveEvent.mode == NotifyUngrab)
     {
         updateKeyModifiers ((int) leaveEvent.state);
-        peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (leaveEvent, peer->getPlatformScaleFactor()),
+        peer->handleMouseEvent (MouseInputSource::InputSourceType::mouse, getLogicalMousePos (Point { leaveEvent.x, leaveEvent.y }, *peer),
                                 ModifierKeys::getCurrentModifiers(), MouseInputSource::defaultPressure,
-                                MouseInputSource::defaultOrientation, getEventTime (leaveEvent));
+                                MouseInputSource::defaultOrientation, getEventTime (leaveEvent.time));
     }
 }
 
@@ -3947,6 +4096,94 @@ void XWindowSystem::handleXEmbedMessage (LinuxComponentPeer* peer, XClientMessag
     }
 }
 
+
+#if JUCE_USE_XINPUT
+void XWindowSystem::handleXIDeviceEvent (LinuxComponentPeer* peer, int eventType, XIDeviceEvent& deviceEvent) const
+{
+    const Point eventPos { deviceEvent.event_x, deviceEvent.event_y };
+
+    switch (eventType)
+    {
+        case XI_ButtonPress:
+        {
+            handleButtonPressEvent (peer,
+                                    deviceEvent.mods.effective,
+                                    deviceEvent.detail,
+                                    deviceEvent.time,
+                                    eventPos);
+            return;
+        }
+        case XI_ButtonRelease:
+        {
+            handleButtonReleaseEvent (peer,
+                                      deviceEvent.mods.effective,
+                                      deviceEvent.detail,
+                                      deviceEvent.time,
+                                      eventPos);
+            return;
+        }
+        case XI_Motion:
+        {
+            handleMotionNotifyEvent (peer,
+                                     deviceEvent.mods.effective,
+                                     deviceEvent.time,
+                                     eventPos);
+            return;
+        }
+    }
+
+    const auto touchIndex = XInputHelpers::currentTouches.getIndexOfTouch (peer, deviceEvent.detail);
+    const auto touchPos = getLogicalMousePos (eventPos, *peer);
+    const auto time = getEventTime (deviceEvent.time);
+
+    const auto sendTouchEvent = [peer, time, touchIndex] (Point<float> pos, ModifierKeys mods)
+    {
+        peer->handleMouseEvent (MouseInputSource::InputSourceType::touch,
+                                pos,
+                                mods,
+                                MouseInputSource::defaultPressure,
+                                MouseInputSource::defaultOrientation,
+                                time,
+                                {},
+                                touchIndex);
+
+        // In case this component was deleted by the event
+        return ComponentPeer::isValidPeer (peer);
+    };
+
+    switch (eventType)
+    {
+        case XI_TouchBegin:
+        {
+            // This forces a mouse-enter/up event, in case we didn't get one before.
+            if (! sendTouchEvent (touchPos, ModifierKeys{}))
+                return;
+
+            break;
+        }
+        case XI_TouchEnd:
+        {
+            XInputHelpers::currentTouches.clearTouch (touchIndex);
+            break;
+        }
+    }
+
+    const auto mouseKeys = eventType == XI_TouchEnd ? ModifierKeys{}
+                                                    : ModifierKeys{}.withFlags (ModifierKeys::leftButtonModifier);
+    if (! sendTouchEvent (touchPos, mouseKeys))
+        return;
+
+    if (eventType == XI_TouchEnd)
+        sendTouchEvent (MouseInputSource::offscreenMousePos, ModifierKeys{});
+}
+
+void XWindowSystem::updateXInputDevices() const
+{
+    for (auto wh : windowHandles)
+        XInputHelpers::registerForXI2Events (display, wh);
+}
+#endif
+
 //==============================================================================
 void XWindowSystem::dismissBlockingModals (LinuxComponentPeer* peer, const XConfigureEvent& configure) const
 {
@@ -3967,7 +4204,7 @@ void XWindowSystem::windowMessageReceive (XEvent& event)
         if (! juce_handleXEmbedEvent (nullptr, &event))
        #endif
         {
-            auto* instance = XWindowSystem::getInstance();
+            auto* instance = getInstance();
 
             if (auto* xSettings = instance->getXSettings())
             {
@@ -3982,9 +4219,62 @@ void XWindowSystem::windowMessageReceive (XEvent& event)
                 }
             }
 
+           #if JUCE_USE_XINPUT
+            if (auto* display = instance->getDisplay();
+                const auto xInputOpcode = XInputHelpers::setupXI2 (display))
+            {
+                // We need to collect and process these mouse events via XInput so that
+                // it is possible to detect, and then ignore (via XISlavePointer),
+                // emulated mouse events when a touch device is connected.
+                switch (event.xany.type)
+                {
+                    case ButtonPress:
+                    case ButtonRelease:
+                    case MotionNotify:
+                        return;
+                }
+
+                if (event.xcookie.type == GenericEvent && event.xcookie.extension == xInputOpcode)
+                {
+
+                    // You can only call xGetEventData once per event, even if you free the data afterwards
+                    if (! X11Symbols::getInstance()->xGetEventData (display, &event.xcookie))
+                        return;
+
+                    const ScopeGuard scope { [display, &event] { X11Symbols::getInstance()->xFreeEventData (display, &event.xcookie); }};
+
+                    switch (event.xcookie.evtype)
+                    {
+                        case XI_HierarchyChanged:
+                            instance->updateXInputDevices();
+                            break;
+
+                        case XI_ButtonPress:
+                        case XI_ButtonRelease:
+                        case XI_Motion:
+                        case XI_TouchBegin:
+                        case XI_TouchEnd:
+                        case XI_TouchUpdate:
+                            if (auto* deviceEvent = (XIDeviceEvent*) event.xcookie.data;
+                                auto* peer = dynamic_cast<LinuxComponentPeer*> (getPeerFor (deviceEvent->event)))
+                                instance->handleXIDeviceEvent (peer, event.xcookie.evtype, *deviceEvent);
+
+                            break;
+
+                        default:
+                            // Unhandled event type
+                            jassertfalse;
+                            break;
+                    }
+
+                    return;
+                }
+            }
+           #endif
+
             if (auto* peer = dynamic_cast<LinuxComponentPeer*> (getPeerFor (event.xany.window)))
             {
-                XWindowSystem::getInstance()->handleWindowMessage (peer, event);
+                instance->handleWindowMessage (peer, event);
                 return;
             }
 

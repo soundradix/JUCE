@@ -113,12 +113,14 @@ bool X11Symbols::loadAllSymbols()
                        makeSymbolBinding (xFree,                       "XFree"),
                        makeSymbolBinding (xFreeCursor,                 "XFreeCursor"),
                        makeSymbolBinding (xFreeColormap,               "XFreeColormap"),
+                       makeSymbolBinding (xFreeEventData,              "XFreeEventData"),
                        makeSymbolBinding (xFreeGC,                     "XFreeGC"),
                        makeSymbolBinding (xFreeModifiermap,            "XFreeModifiermap"),
                        makeSymbolBinding (xFreePixmap,                 "XFreePixmap"),
                        makeSymbolBinding (xGetAtomName,                "XGetAtomName"),
                        makeSymbolBinding (xGetErrorDatabaseText,       "XGetErrorDatabaseText"),
                        makeSymbolBinding (xGetErrorText,               "XGetErrorText"),
+                       makeSymbolBinding (xGetEventData,               "XGetEventData"),
                        makeSymbolBinding (xGetGeometry,                "XGetGeometry"),
                        makeSymbolBinding (xGetImage,                   "XGetImage"),
                        makeSymbolBinding (xGetInputFocus,              "XGetInputFocus"),
@@ -223,6 +225,13 @@ bool X11Symbols::loadAllSymbols()
                  makeSymbolBinding (xShmGetEventBase,            "XShmGetEventBase"),
                  makeSymbolBinding (xShmPutImage,                "XShmPutImage"),
                  makeSymbolBinding (xShmQueryVersion,            "XShmQueryVersion"));
+   #endif
+   #if JUCE_USE_XINPUT
+    loadSymbols (xinputLib,
+                 makeSymbolBinding (xiQueryVersion,              "XIQueryVersion"),
+                 makeSymbolBinding (xiQueryDevice,               "XIQueryDevice"),
+                 makeSymbolBinding (xiFreeDeviceInfo,            "XIFreeDeviceInfo"),
+                 makeSymbolBinding (xiSelectEvents,              "XISelectEvents"));
    #endif
 
     return true;
