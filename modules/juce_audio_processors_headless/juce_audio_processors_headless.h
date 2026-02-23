@@ -138,7 +138,7 @@
 #include <juce_audio_processors_headless/utilities/juce_VST3Interface.h>
 #include <juce_audio_processors_headless/utilities/juce_VST3ClientExtensions.h>
 #include <juce_audio_processors_headless/format_types/juce_ARACommon.h>
-#include <juce_audio_processors_headless/utilities/juce_ExtensionsVisitor.h>
+#include <juce_audio_processors_headless/utilities/juce_AudioPluginExtensions.h>
 #include <juce_audio_processors_headless/processors/juce_AudioProcessorParameter.h>
 #include <juce_audio_processors_headless/processors/juce_HostedAudioProcessorParameter.h>
 #include <juce_audio_processors_headless/processors/juce_AudioProcessorParameterGroup.h>

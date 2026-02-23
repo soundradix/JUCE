@@ -125,7 +125,7 @@ struct ComponentHelpers
     template <typename PointOrRect>
     static PointOrRect convertToParentSpace (const Component& comp, const PointOrRect pointInLocalSpace)
     {
-        const auto preTransform = [&]
+        const auto preTransform = std::invoke ([&]
         {
             if (comp.isOnDesktop())
             {
@@ -140,7 +140,7 @@ struct ComponentHelpers
                 return SH::unscaledScreenPosToScaled (SH::scaledScreenPosToUnscaled (comp, SH::addPosition (pointInLocalSpace, comp)));
 
             return SH::addPosition (pointInLocalSpace, comp);
-        }();
+        });
 
         return comp.affineTransform != nullptr ? preTransform.transformedBy (*comp.affineTransform)
                                                : preTransform;
@@ -198,7 +198,7 @@ struct ComponentHelpers
         if (auto* p = comp.getParentComponent())
             return p->getLocalBounds();
 
-        return Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea;
+        return Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.toNearestInt();
     }
 
     static void releaseAllCachedImageResources (Component& c)
@@ -258,6 +258,23 @@ struct ComponentHelpers
 
         detail::CallbackListenerList<> listeners;
     };
+
+    struct TopLeftPosition
+    {
+        Point<float> multimonitor;  // Coordinate in multimonitor space
+        Point<float> logical;       // Coordinate in logical space
+    };
+
+    static TopLeftPosition getTopLeftForPeer (ComponentPeer& peer,
+                                              Point<float> logicalScreenPos,
+                                              Point<float> localPos)
+    {
+        const auto localTarget = peer.globalToLocal (SH::scaledScreenPosToUnscaled (logicalScreenPos));
+        const auto multimonitorTarget = peer.localToMultimonitor (localTarget - localPos);
+        const auto logicalTarget = SH::unscaledScreenPosToScaled (peer.getComponent(), peer.localToGlobal (localTarget - localPos));
+
+        return { multimonitorTarget, logicalTarget };
+    }
 };
 
 } // namespace juce::detail

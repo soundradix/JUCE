@@ -1358,7 +1358,8 @@ public:
             env->CallVoidMethod (view.get(), AndroidView.setLayoutParams, viewLayoutParams.get());
 
             const auto rawPeerBounds = detail::ComponentHelpers::localPositionToRawPeerPos (comp, comp.getBoundsInParent().toFloat());
-            const auto physicalBounds = Desktop::getInstance().getDisplays().logicalToPhysical (rawPeerBounds).toNearestInt();
+            const auto physicalBounds = Rectangle { detail::ScalingHelpers::convertLogicalScreenPointToPhysical (rawPeerBounds.getTopLeft()),
+                                                    detail::ScalingHelpers::convertLogicalScreenPointToPhysical (rawPeerBounds.getBottomRight()) }.toNearestInt();
 
             view.callVoidMethod (AndroidView.layout,
                                  physicalBounds.getX(), physicalBounds.getY(), physicalBounds.getRight(), physicalBounds.getBottom());
@@ -1505,7 +1506,8 @@ public:
 
     void setBounds (const Rectangle<int>& userRect, bool isNowFullScreen) override
     {
-        auto bounds = Desktop::getInstance().getDisplays().logicalToPhysical (userRect);
+        auto bounds = Rectangle { detail::ScalingHelpers::convertLogicalScreenPointToPhysical (userRect.getTopLeft().toFloat()),
+                                  detail::ScalingHelpers::convertLogicalScreenPointToPhysical (userRect.getBottomRight().toFloat()) }.toNearestInt();
 
         if (MessageManager::getInstance()->isThisTheMessageThread())
         {
@@ -1585,12 +1587,14 @@ public:
 
     Rectangle<int> getBounds() const override
     {
-        Rectangle<int> bounds (view.callIntMethod (AndroidView.getLeft),
-                               view.callIntMethod (AndroidView.getTop),
-                               view.callIntMethod (AndroidView.getWidth),
-                               view.callIntMethod (AndroidView.getHeight));
+        const Rectangle bounds (view.callIntMethod (AndroidView.getLeft),
+                                view.callIntMethod (AndroidView.getTop),
+                                view.callIntMethod (AndroidView.getWidth),
+                                view.callIntMethod (AndroidView.getHeight));
 
-        return Desktop::getInstance().getDisplays().physicalToLogical (bounds);
+        const auto result = Rectangle { detail::ScalingHelpers::convertPhysicalScreenPointToLogical (bounds.getTopLeft().toFloat()),
+                                        detail::ScalingHelpers::convertPhysicalScreenPointToLogical (bounds.getBottomRight().toFloat()) }.toNearestInt();
+        return result;
     }
 
     void handleScreenSizeChange() override
@@ -1604,7 +1608,7 @@ public:
     Point<int> getScreenPosition() const
     {
         const auto physical = getViewLocationOnScreen (getEnv(), view.get());
-        return Desktop::getInstance().getDisplays().physicalToLogical (physical);
+        return detail::ScalingHelpers::convertPhysicalScreenPointToLogical (physical.toFloat()).roundToInt();
     }
 
     Point<float> localToGlobal (Point<float> relativePosition) override
@@ -1647,7 +1651,7 @@ public:
             // us.
             if (shouldBeFullScreen)
                 if (auto* display = Desktop::getInstance().getDisplays().getPrimaryDisplay())
-                    return display->userArea;
+                    return display->userBounds.getSmallestIntegerContainer();
 
             return lastNonFullscreenBounds.isEmpty() ? getBounds() : lastNonFullscreenBounds;
         });
@@ -1715,7 +1719,7 @@ public:
     //==============================================================================
     void handleMouseDownCallback (int index, Point<float> sysPos, int64 time)
     {
-        lastMousePos = Desktop::getInstance().getDisplays().physicalToLogical (sysPos);
+        lastMousePos = detail::ScalingHelpers::convertPhysicalScreenPointToLogical (sysPos);
         auto pos = globalToLocal (lastMousePos);
 
         // this forces a mouse-enter/up event, in case for some reason we didn't get a mouse-up before
@@ -1734,7 +1738,7 @@ public:
 
     void handleMouseDragCallback (int index, Point<float> sysPos, int64 time)
     {
-        lastMousePos = Desktop::getInstance().getDisplays().physicalToLogical (sysPos);
+        lastMousePos = detail::ScalingHelpers::convertPhysicalScreenPointToLogical (sysPos);
         auto pos = globalToLocal (lastMousePos);
 
         jassert (index < 64);
@@ -1754,7 +1758,7 @@ public:
 
     void handleMouseUpCallback (int index, Point<float> sysPos, int64 time)
     {
-        lastMousePos = Desktop::getInstance().getDisplays().physicalToLogical (sysPos);
+        lastMousePos = detail::ScalingHelpers::convertPhysicalScreenPointToLogical (sysPos);
         auto pos = globalToLocal (lastMousePos);
 
         jassert (index < 64);
@@ -1801,7 +1805,7 @@ public:
 
         if (auto* topHandler = component.getAccessibilityHandler())
         {
-            const auto rawPeerPos = Desktop::getInstance().getDisplays().physicalToLogical (sysPos);
+            const auto rawPeerPos = detail::ScalingHelpers::convertPhysicalScreenPointToLogical (sysPos);
             const auto localPos = detail::ComponentHelpers::rawPeerPositionToLocal (component, rawPeerPos);
 
             if (auto* virtualHandler = topHandler->getChildAt (localPos.roundToInt()))
@@ -2063,7 +2067,8 @@ public:
 
     void repaint (const Rectangle<int>& userArea) override
     {
-        const auto area = Desktop::getInstance().getDisplays().logicalToPhysical (userArea.toFloat()).toNearestInt();
+        const auto area = Rectangle { detail::ScalingHelpers::convertLogicalScreenPointToPhysical (userArea.getTopLeft().toFloat()),
+                                      detail::ScalingHelpers::convertLogicalScreenPointToPhysical (userArea.getBottomRight().toFloat()) }.toNearestInt();
 
         GlobalRef localView (view);
 
@@ -2874,8 +2879,9 @@ void Displays::findDisplays (const Desktop& desktop)
     d.dpi = (d.scale * 160.f);
     d.scale *= desktop.getGlobalScaleFactor();
 
-    d.totalArea = Rectangle<int> (env->GetIntField (displayMetrics, AndroidDisplayMetrics.widthPixels),
-                                  env->GetIntField (displayMetrics, AndroidDisplayMetrics.heightPixels)) / d.scale;
+    d.physicalBounds = Rectangle (env->GetIntField (displayMetrics, AndroidDisplayMetrics.widthPixels),
+                                  env->GetIntField (displayMetrics, AndroidDisplayMetrics.heightPixels));
+    d.logicalBounds = d.physicalBounds.toFloat() / d.scale;
 
     LocalRef activity { getMainActivity() };
     LocalRef mainWindow { activity != nullptr
@@ -2908,18 +2914,18 @@ void Displays::findDisplays (const Desktop& desktop)
     {
         const LocalRef<jobject> windowMetrics (env->CallObjectMethod (windowManager, AndroidWindowManager30.getCurrentWindowMetrics));
         const LocalRef<jobject> bounds (env->CallObjectMethod (windowMetrics, AndroidWindowMetrics.getBounds));
-        d.userArea = (Rectangle<int>::leftTopRightBottom (env->GetIntField (bounds, AndroidRect.left),
-                                                          env->GetIntField (bounds, AndroidRect.top),
-                                                          env->GetIntField (bounds, AndroidRect.right),
-                                                          env->GetIntField (bounds, AndroidRect.bottom)) / d.scale);
+        d.userBounds = (Rectangle<int>::leftTopRightBottom (env->GetIntField (bounds, AndroidRect.left),
+                                                            env->GetIntField (bounds, AndroidRect.top),
+                                                            env->GetIntField (bounds, AndroidRect.right),
+                                                            env->GetIntField (bounds, AndroidRect.bottom)).toFloat() / d.scale);
     }
     else
     {
-        d.userArea = std::invoke ([&]
+        d.userBounds = std::invoke ([&]
         {
             // No content view yet; approximate with display size
             if (contentView == nullptr)
-                return d.totalArea;
+                return d.logicalBounds;
 
             const auto topLeft = AndroidComponentPeer::getViewLocationOnScreen (env, contentView);
 
@@ -2928,10 +2934,10 @@ void Displays::findDisplays (const Desktop& desktop)
             const auto contentSize = Rectangle { topLeft.x,
                                                  topLeft.y,
                                                  env->CallIntMethod (contentView, AndroidView.getWidth),
-                                                 env->CallIntMethod (contentView, AndroidView.getHeight) } / d.scale;
+                                                 env->CallIntMethod (contentView, AndroidView.getHeight) }.toFloat() / d.scale;
 
             if (contentSize.isEmpty())
-                return d.totalArea;
+                return d.logicalBounds;
 
             return contentSize;
         });

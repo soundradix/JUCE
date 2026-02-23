@@ -837,24 +837,6 @@ float Font::getHeightInPoints() const
 float Font::getAscentInPoints() const       { return font->getAscentDescent (*this).ascent  * getHeightInPoints(); }
 float Font::getDescentInPoints() const      { return font->getAscentDescent (*this).descent * getHeightInPoints(); }
 
-int Font::getStringWidth (const String& text) const
-{
-    JUCE_BEGIN_IGNORE_DEPRECATION_WARNINGS
-    return (int) std::ceil (getStringWidthFloat (text));
-    JUCE_END_IGNORE_DEPRECATION_WARNINGS
-}
-
-float Font::getStringWidthFloat (const String& text) const
-{
-    if (auto typeface = getTypefacePtr())
-    {
-        const auto w = typeface->getStringWidth (getMetricsKind(), text, getHeight(), getHorizontalScale());
-        return w + (getHeight() * getHorizontalScale() * getExtraKerningFactor() * (float) text.length());
-    }
-
-    return 0;
-}
-
 void Font::findFonts (Array<Font>& destArray)
 {
     for (auto& name : findAllTypefaceNames())

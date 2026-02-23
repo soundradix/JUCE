@@ -756,7 +756,8 @@ struct BackgroundDownloadTask final : public URL::DownloadTask
     //==============================================================================
     struct DelegateClass final : public ObjCClass<NSObject<NSURLSessionDelegate>>
     {
-        DelegateClass()  : ObjCClass<NSObject<NSURLSessionDelegate>> ("JUCE_URLDelegate_")
+        DelegateClass()
+            : ObjCClass ("JUCE_URLDelegate_")
         {
             addIvar<BackgroundDownloadTask*> ("state");
 

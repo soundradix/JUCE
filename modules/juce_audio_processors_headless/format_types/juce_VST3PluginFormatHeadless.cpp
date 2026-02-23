@@ -43,14 +43,6 @@ namespace juce
 // it won't recognize the dynamic types of pointers to the plugin's interfaces.
 JUCE_BEGIN_NO_SANITIZE ("vptr")
 
-bool VST3PluginFormatHeadless::setStateFromVSTPresetFile (AudioPluginInstance* api, const MemoryBlock& rawData)
-{
-    if (auto vst3 = dynamic_cast<VST3PluginInstanceHeadless*> (api))
-        return vst3->setStateFromPresetFile (rawData);
-
-    return false;
-}
-
 void VST3PluginFormatHeadless::findAllTypesForFile (OwnedArray<PluginDescription>& results, const String& fileOrIdentifier)
 {
     if (! fileMightContainThisPluginType (fileOrIdentifier))

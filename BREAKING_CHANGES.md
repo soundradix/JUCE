@@ -4,6 +4,218 @@
 
 ## Change
 
+AudioPluginInstance::getPlatformSpecificData() has been removed.
+
+**Possible Issues**
+
+Code that calls this function will fail to compile.
+
+**Workaround**
+
+Use the new member functions of AudioPluginInstance - getVSTClient(),
+getVST3Client(), getAudioUnitClient(), and getARAClient() - to retrieve data
+relating to the underlying implementation.
+
+**Rationale**
+
+This change allows calling code to be more self-documenting and type-safe.
+
+
+## Change
+
+The following functions have new signatures:
+- VSTPluginFormatHeadless::loadFromFXBFile()
+- VSTPluginFormatHeadless::setChunkData()
+- VSTPluginFormatHeadless::setExtraFunctions()
+
+**Possible Issues**
+
+Code that calls these functions will fail to compile.
+
+**Workaround**
+
+Instead of passing a separate data pointer and size, pass a Span of bytes to
+loadFromFXBFile() and setChunkData().
+
+Pass a unique_ptr<ExtraFunctions> to setExtraFunctions(). You may wish to use
+rawToUniquePtr() to convert a raw pointer to a unique_ptr.
+
+**Rationale**
+
+These changes result in interfaces that are more self-documenting.
+
+
+## Change
+
+The following functions have been removed:
+- VSTPluginFormatHeadless::getVSTXML()
+- VSTPluginFormatHeadless::loadFromFXBFile()
+- VSTPluginFormatHeadless::saveToFXBFile()
+- VSTPluginFormatHeadless::getChunkData()
+- VSTPluginFormatHeadless::setChunkData()
+- VSTPluginFormatHeadless::setExtraFunctions()
+- VSTPluginFormatHeadless::dispatcher()
+- VST3PluginFormatHeadless::setStateFromVSTPresetFile()
+
+**Possible Issues**
+
+Code that references these functions will fail to compile.
+
+**Workaround**
+
+Retrieve a client interface from an AudioPluginInstance by calling
+AudioPluginClient::getVSTClient() or AudioPluginClient::getVST3Client(), then
+call the appropriate member function on the client interface.
+
+**Rationale**
+
+This approach leads to more intuitive code. It's no longer necessary to call a
+static member function of the plugin format in order to interact with
+format-specific aspects of a particular plugin instance.
+
+
+## Change
+
+The ExtensionsVisitor type has been removed.
+
+**Possible Issues**
+
+Code that references this type, e.g. by deriving from it, will fail to compile.
+
+**Workaround**
+
+Use the new member functions of AudioPluginInstance - getVSTClient(),
+getVST3Client(), getAudioUnitClient(), and getARAClient() - to interact with
+format-specific aspects of the wrapped plugin.
+
+**Rationale**
+
+The visitor pattern results in very boilerplate-heavy code, both for
+implementers and for users. The new API is much more lightweight. Additionally,
+the ExtensionsVisitor API was intended for advanced users who should be able to
+migrate to a new API without much difficulty.
+
+
+## Change
+
+The following member functions of Typeface have been removed:
+- Typeface::getStringWidth()
+- Typeface::getGlyphPositions()
+- Typeface::getEdgeTableForGlyph()
+- Typeface::applyVerticalHintingTransform()
+
+The following member functions of Font have been removed:
+- Font::getStringWidth()
+- Font::getStringWidthFloat()
+
+The signatures of the following functions have changed, removing the 
+TypefaceMetricsKind argument:
+- Typeface::getOutlineForGlyph()
+- Typeface::getGlyphBounds()
+- Typeface::getLayersForGlyph()
+
+**Possible Issues**
+
+Code that uses these functions will fail to compile.
+
+**Workaround**
+
+Use GlyphArrangement::getStringWidth() or TextLayout::getStringWidth() to find
+the width of a string taking font-fallback and shaping into account.
+
+To find individual glyph positions, lay out the string using GlyphArrangement
+or TextLayout, then use the positions provided by
+GlyphArrangement::PositionedGlyph and/or TextLayout::Glyph.
+
+Use getLayersForGlyph() instead of getEdgeTableForGlyph() when rendering
+individual glyphs.
+
+Where function signatures have changed, those functions now always normalise
+their results to a point size of 1.0. If necessary, you can use
+Typeface::getMetrics() to find the appropriate scale factor to convert to "JUCE
+height" using portable or legacy metrics.
+
+**Rationale**
+
+Removing deprecated functions simplifies the framework and reduces ongoing
+maintenance costs.
+
+
+## Change
+
+The overloads of Displays::logicalToPhysical and Displays::physicalToLogical
+that take a Point<int> have been deprecated.
+
+**Possible Issues**
+
+Code that uses the deprecated functions may emit a warning at compile time.
+
+**Workaround**
+
+Use the new Point<float> overloads.
+
+**Rationale**
+
+When working in logical coordinate space, rounding coordinates to integer
+values loses precision and can be error-prone. This is especially the case for
+mouse coordinates: rounding the mouse position to logical coordinates and then
+back to physical can produce a different result, that might even lie outside
+the original display. This deprecation is intended to encourage users to avoid
+rounding logical coordinates unnecessarily.
+
+
+## Change
+
+The overload of Displays::getDisplayForPoint that takes a Point<int> has been
+deprecated.
+
+**Possible Issues**
+
+Code that uses the deprecated function may emit a warning at compile time.
+
+**Workaround**
+
+Use the new Point<float> overload.
+
+**Rationale**
+
+When working in logical coordinate space, rounding coordinates to integer
+values loses precision and can be error-prone. This is especially the case for
+mouse coordinates: rounding the mouse position to logical coordinates and then
+back to physical can produce a different result, that might even lie outside
+the original display. This deprecation is intended to encourage users to avoid
+rounding logical coordinates unnecessarily.
+
+
+## Change
+
+The totalArea, userArea, and topLeftPhysical data members of Displays::Display
+have been deprecated.
+
+**Possible Issues**
+
+Code that uses the deprecated data members may emit a warning at compile time.
+
+**Workaround**
+
+Use the new logicalBounds, userBounds, and physicalBounds data members,
+respectively.
+
+**Rationale**
+
+When a display is using a fractional scale, or when a fractional global scale
+is set in JUCE, the physical bounds may not be representable using integers in
+logical coordinate space, so the old totalArea field was sometimes rounded to
+the closest integer values. This also made it impossible to reconstruct the
+actual physical bounds of the display, since multiplying the rounded logical
+bounds by the scale factor would produce an incorrect result.
+
+The Displays struct now provides the exact physical size of the display, along
+with more precise representations of the logical and user bounds.
+
+
+## Change
+
 A new type member ARAConfigurationType has been added to
 ARADemoPluginDocumentControllerSpecialisation.
 

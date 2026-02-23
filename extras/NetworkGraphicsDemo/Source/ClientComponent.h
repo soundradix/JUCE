@@ -192,7 +192,7 @@ private:
         {
             auto screenBounds = getScreenBounds();
             auto* display = Desktop::getInstance().getDisplays().getDisplayForPoint (screenBounds.getCentre());
-            return ((screenBounds - display->userArea.getCentre()).toFloat() / (client->scaleFactor * display->dpi / display->scale)) + client->centre;
+            return ((screenBounds.toFloat() - display->userBounds.getCentre()) / (client->scaleFactor * display->dpi / display->scale)) + client->centre;
         }
 
         return {};
@@ -203,7 +203,7 @@ private:
         if (auto client = canvas.findClient (clientName))
         {
             auto* display = Desktop::getInstance().getDisplays().getDisplayForPoint (getScreenBounds().getCentre());
-            return (display->userArea.toFloat() / (client->scaleFactor * display->dpi / display->scale)).withCentre (client->centre);
+            return (display->userBounds / (client->scaleFactor * display->dpi / display->scale)).withCentre (client->centre);
         }
 
         return {};

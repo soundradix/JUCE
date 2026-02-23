@@ -239,6 +239,20 @@ public:
     /** Converts a screen area to a position relative to the top-left of this component. */
     Rectangle<float> globalToLocal (const Rectangle<float>& screenPosition);
 
+    /** Converts the argument, in local peer coordinates, to a continuous coordinate space
+        suitable for positioning windows consistently in multimonitor setups.
+
+        @see multimonitorToLocal()
+    */
+    virtual Point<float> localToMultimonitor (Point<float> x) { return localToGlobal (x); }
+
+    /** Converts the argument, in a continuous coordinate space suitable for positioning windows
+        consistently in multimonitor setups, to local peer coordinates.
+
+        @see localToMultimonitor()
+    */
+    virtual Point<float> multimonitorToLocal (Point<float> x) { return globalToLocal (x); }
+
     /** Returns the area in peer coordinates that is covered by the given sub-comp (which
         may be at any depth)
     */
@@ -603,6 +617,64 @@ public:
     */
     uint64_t getNumFramesPainted() const { return peerFrameNumber; }
 
+    auto setMultimonitorPositionOverride (Point<int> pendingPosition)
+    {
+        struct Disabler
+        {
+            Disabler() = default;
+            Disabler (Component* x, Point<int> next)
+                : self (x)
+            {
+                if (auto* peer = getPeer())
+                    previous = std::exchange (peer->multimonitorPositionOverride, next);
+            }
+
+            Disabler (Disabler&& other) noexcept
+                : self (std::exchange (other.self, {})),
+                  previous (std::exchange (other.previous, {}))
+            {
+            }
+
+            Disabler (const Disabler& other) = delete;
+
+            Disabler& operator= (Disabler&& other) noexcept
+            {
+                Disabler { std::move (other) }.swap (*this);
+                return *this;
+            }
+
+            Disabler& operator= (const Disabler& other) = delete;
+
+            ~Disabler()
+            {
+                if (auto* peer = getPeer())
+                    peer->multimonitorPositionOverride = previous;
+            }
+
+            void swap (Disabler& other) noexcept
+            {
+                std::swap (other.self, self);
+                std::swap (other.previous, previous);
+            }
+
+            ComponentPeer* getPeer() const
+            {
+                if (self != nullptr)
+                    return self->getPeer();
+
+                return nullptr;
+            }
+
+            WeakReference<Component> self;
+            std::optional<Point<int>> previous;
+        };
+
+        return Disabler { &component, pendingPosition };
+    }
+
+    /** @internal */
+    auto getMultimonitorPositionOverride() const { return multimonitorPositionOverride; }
+
 protected:
     //==============================================================================
     static void forceDisplayUpdate();
@@ -646,6 +718,7 @@ private:
     Component* lastDragAndDropCompUnderMouse = nullptr;
     TextInputTarget* textInputTarget = nullptr;
     const uint32 uniqueID;
+    std::optional<Point<int>> multimonitorPositionOverride;
     uint64_t peerFrameNumber = 0;
     bool isWindowMinimised = false;
 

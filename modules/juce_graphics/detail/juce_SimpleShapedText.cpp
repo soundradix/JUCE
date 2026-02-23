@@ -407,7 +407,7 @@ static std::vector<ShapedGlyph> lowLevelShape (const SanitisedString& string,
         const auto extents = native->getGlyphExtents (glyphId);
 
         const auto whitespace = extents.has_value()
-                                && font.getTypefacePtr()->getGlyphBounds (font.getMetricsKind(), (int) glyphId).isEmpty()
+                                && font.getTypefacePtr()->getGlyphBounds ((int) glyphId).isEmpty()
                                 && xAdvanceBase > 0;
 
         const auto newline = string.isNewline (infos[visualIndex].cluster + (size_t) range.getStart());

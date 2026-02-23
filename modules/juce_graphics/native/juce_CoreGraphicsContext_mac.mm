@@ -983,12 +983,12 @@ void CoreGraphicsContext::drawGlyphs (Span<const uint16_t> glyphs,
     {
         Path p;
         auto& f = state->font;
-        f.getTypefacePtr()->getOutlineForGlyph (f.getMetricsKind(), glyph, p);
+        f.getTypefacePtr()->getOutlineForGlyph (glyph, p);
 
         if (p.isEmpty())
             continue;
 
-        const auto scale = f.getHeight();
+        const auto scale = f.getHeightInPoints();
         fillPath (p, AffineTransform::scale (scale * f.getHorizontalScale(), scale).translated (positions[index]).followedBy (transform));
     }
 }

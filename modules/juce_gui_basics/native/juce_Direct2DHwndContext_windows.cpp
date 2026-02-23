@@ -294,9 +294,6 @@ private:
     // Areas that must be repainted during the next paint call, between startFrame/endFrame
     RectangleList<int> deferredRepaints;
 
-    // Areas that have been updated in the backbuffer, but not presented
-    RectangleList<int> dirtyRegionsInBackBuffer;
-
     std::vector<RECT> dirtyRectangles;
     int64 lastFinishFrameTicks = 0;
 
@@ -417,9 +414,6 @@ public:
         // Require the entire window to be repainted
         deferredRepaints = size;
 
-        // The backbuffer has no valid content until we paint a full frame
-        dirtyRegionsInBackBuffer.clear();
-
         InvalidateRect (hwnd, nullptr, TRUE);
 
         // Resize/scale the swap chain
@@ -447,12 +441,6 @@ public:
         if (savedState == nullptr)
             return nullptr;
 
-        // If a new frame is starting, clear deferredAreas in case repaint is called
-        // while the frame is being painted to ensure the new areas are painted on the
-        // next frame
-        dirtyRegionsInBackBuffer.add (deferredRepaints);
-        deferredRepaints.clear();
-
         JUCE_TRACE_LOG_D2D_PAINT_CALL (etw::direct2dHwndPaintStart, getFrameId());
 
         return savedState;
@@ -470,22 +458,22 @@ public:
     {
         JUCE_D2DMETRICS_SCOPED_ELAPSED_TIME (getMetrics(), present1Duration);
 
-        if (swap.getBuffer() == nullptr || dirtyRegionsInBackBuffer.isEmpty())
+        if (swap.getBuffer() == nullptr || deferredRepaints.isEmpty())
             return;
 
         auto const swapChainSize = swap.getSize();
         DXGI_PRESENT_PARAMETERS params{};
 
-        if (! dirtyRegionsInBackBuffer.containsRectangle (swapChainSize))
+        if (! deferredRepaints.containsRectangle (swapChainSize))
         {
             // Allocate enough memory for the array of dirty rectangles
-            dirtyRectangles.resize ((size_t) dirtyRegionsInBackBuffer.getNumRectangles());
+            dirtyRectangles.resize ((size_t) deferredRepaints.getNumRectangles());
 
             // Fill the array of dirty rectangles, intersecting each paint area with the swap chain buffer
             params.pDirtyRects = dirtyRectangles.data();
             params.DirtyRectsCount = 0;
 
-            for (const auto& area : dirtyRegionsInBackBuffer)
+            for (const auto& area : deferredRepaints)
             {
                 const auto intersection = area.getIntersection (swapChainSize);
 
@@ -504,7 +492,7 @@ public:
             return;
 
         // There's nothing waiting to be displayed in the backbuffer.
-        dirtyRegionsInBackBuffer.clear();
+        deferredRepaints.clear();
 
         JUCE_TRACE_LOG_D2D_PAINT_CALL (etw::direct2dHwndPaintEnd, getFrameId());
     }

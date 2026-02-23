@@ -573,6 +573,10 @@ class AudioUnitPluginWindowCocoa;
 
 //==============================================================================
 class AudioUnitPluginInstanceHeadless : public AudioPluginInstance
+                                      , private AudioPluginExtensions::AudioUnitClient
+                                     #ifdef JUCE_INTERNAL_HAS_ARA
+                                      , private AudioPluginExtensions::ARAClient
+                                     #endif
 {
 public:
     struct AUInstanceParameter final  : public Parameter
@@ -1141,48 +1145,28 @@ public:
        #endif
     }
 
-    void getExtensions (ExtensionsVisitor& visitor) const override
+          AudioPluginExtensions::AudioUnitClient* getAudioUnitClient()       override { return this; }
+    const AudioPluginExtensions::AudioUnitClient* getAudioUnitClient() const override { return this; }
+
+   #ifdef JUCE_INTERNAL_HAS_ARA
+          AudioPluginExtensions::ARAClient* getARAClient()       override { return this; }
+    const AudioPluginExtensions::ARAClient* getARAClient() const override { return this; }
+
+    void createARAFactoryAsync (std::function<void (ARAFactoryWrapper)> cb) const override
     {
-        struct Extensions final : public ExtensionsVisitor::AudioUnitClient
+        getOrCreateARAAudioUnit ({ auComponent, isAUv3 }, [origCb = std::move (cb)] (auto dylibKeepAliveAudioUnit)
         {
-            explicit Extensions (const AudioUnitPluginInstanceHeadless* instanceIn) : instance (instanceIn) {}
-
-            AudioUnit getAudioUnitHandle() const noexcept override   { return instance->audioUnit; }
-
-            const AudioUnitPluginInstanceHeadless* instance = nullptr;
-        };
-
-        visitor.visitAudioUnitClient (Extensions { this });
-
-       #ifdef JUCE_INTERNAL_HAS_ARA
-        struct ARAExtensions final : public ExtensionsVisitor::ARAClient
-        {
-            explicit ARAExtensions (const AudioUnitPluginInstanceHeadless* instanceIn) : instance (instanceIn) {}
-
-            void createARAFactoryAsync (std::function<void (ARAFactoryWrapper)> cb) const override
+            origCb (std::invoke ([&]
             {
-                getOrCreateARAAudioUnit ({ instance->auComponent, instance->isAUv3 },
-                                         [origCb = std::move (cb)] (auto dylibKeepAliveAudioUnit)
-                                         {
-                                             origCb ([&]() -> ARAFactoryWrapper
-                                                     {
-                                                         if (dylibKeepAliveAudioUnit != nullptr)
-                                                             return ARAFactoryWrapper { ::juce::getARAFactory (std::move (dylibKeepAliveAudioUnit)) };
+                if (dylibKeepAliveAudioUnit != nullptr)
+                    return ARAFactoryWrapper { ::juce::getARAFactory (std::move (dylibKeepAliveAudioUnit)) };
 
-                                                         return ARAFactoryWrapper { nullptr };
-                                                     }());
-                                         });
-            }
-
-            const AudioUnitPluginInstanceHeadless* instance = nullptr;
-        };
-
-        if (hasARAExtension (audioUnit))
-            visitor.visitARAClient (ARAExtensions (this));
-       #endif
+                return ARAFactoryWrapper { nullptr };
+            }));
+        });
     }
+   #endif
 
-    void* getPlatformSpecificData() override             { return audioUnit; }
     const String getName() const override                { return pluginName; }
 
     double getTailLengthSeconds() const override
@@ -1200,7 +1184,7 @@ public:
     bool acceptsMidi() const override                    { return wantsMidiMessages; }
     bool producesMidi() const override                   { return producesMidiMessages; }
 
-    AudioUnit getAudioUnitHandle() const                 { return audioUnit; }
+    AudioUnit getAudioUnitHandle() const noexcept override { return audioUnit; }
 
     //==============================================================================
     // AudioProcessor methods:

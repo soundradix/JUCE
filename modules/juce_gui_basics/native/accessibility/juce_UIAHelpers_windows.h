@@ -35,12 +35,53 @@
 namespace juce
 {
 
+class SafeArrayHandle
+{
+public:
+    SafeArrayHandle() = default;
+
+    explicit SafeArrayHandle (SAFEARRAY* x) : ptr (x) {}
+
+    SafeArrayHandle (const SafeArrayHandle& x) = delete;
+    SafeArrayHandle& operator= (const SafeArrayHandle& x) = delete;
+
+    SafeArrayHandle (SafeArrayHandle&& x) noexcept : ptr (std::exchange (x.ptr, {})) {}
+    SafeArrayHandle& operator= (SafeArrayHandle&& x) noexcept
+    {
+        SafeArrayHandle tmp { std::move (x) };
+        std::swap (tmp.ptr, ptr);
+        return *this;
+    }
+
+    ~SafeArrayHandle()
+    {
+        if (ptr != nullptr)
+            SafeArrayDestroy (ptr);
+    }
+
+    SAFEARRAY* release()
+    {
+        return std::exchange (ptr, {});
+    }
+
+    [[nodiscard]] SAFEARRAY* get() const
+    {
+        return ptr;
+    }
+
+    bool operator== (std::nullptr_t) const { return ptr == nullptr; }
+    bool operator!= (std::nullptr_t) const { return ptr != nullptr; }
+
+private:
+    SAFEARRAY* ptr = nullptr;
+};
+
 namespace VariantHelpers
 {
     namespace Detail
     {
         template <typename Fn, typename ValueType>
-        inline VARIANT getWithValueGeneric (Fn&& setter, ValueType value)
+        VARIANT getWithValueGeneric (Fn&& setter, ValueType value)
         {
             VARIANT result{};
             setter (value, &result);
@@ -112,7 +153,7 @@ inline JUCE_COMRESULT addHandlersToArray (const std::vector<const AccessibilityH
 }
 
 template <typename Value, typename Object, typename Callback>
-inline JUCE_COMRESULT withCheckedComArgs (Value* pRetVal, Object& handle, Callback&& callback)
+JUCE_COMRESULT withCheckedComArgs (Value* pRetVal, Object& handle, Callback&& callback)
 {
     if (pRetVal == nullptr)
         return E_INVALIDARG;

@@ -1950,7 +1950,7 @@ void UIViewComponentPeer::setFullScreen (bool shouldBeFullScreen)
 {
     if (! isSharedWindow)
     {
-        auto r = shouldBeFullScreen ? Desktop::getInstance().getDisplays().getPrimaryDisplay()->userArea
+        auto r = shouldBeFullScreen ? Desktop::getInstance().getDisplays().getPrimaryDisplay()->userBounds.getSmallestIntegerContainer()
                                     : lastNonFullscreenBounds;
 
         if ((! shouldBeFullScreen) && r.isEmpty())
@@ -1975,7 +1975,7 @@ void UIViewComponentPeer::updateScreenBounds()
     auto& desktop = Desktop::getInstance();
 
     auto oldArea = component.getBounds();
-    auto oldDesktop = desktop.getDisplays().getPrimaryDisplay()->userArea;
+    auto oldDesktop = desktop.getDisplays().getPrimaryDisplay()->userBounds.getSmallestIntegerContainer();
 
     forceDisplayUpdate();
 
@@ -1986,7 +1986,7 @@ void UIViewComponentPeer::updateScreenBounds()
     }
     else if (! isSharedWindow)
     {
-        auto newDesktop = desktop.getDisplays().getPrimaryDisplay()->userArea;
+        auto newDesktop = desktop.getDisplays().getPrimaryDisplay()->userBounds.getSmallestIntegerContainer();
 
         if (newDesktop != oldDesktop)
         {

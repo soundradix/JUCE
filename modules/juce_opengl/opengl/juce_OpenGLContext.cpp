@@ -443,13 +443,14 @@ public:
     {
         JUCE_ASSERT_MESSAGE_THREAD
 
-        if (auto* peer = component.getPeer())
+        if ([[maybe_unused]] auto* peer = component.getPeer())
         {
-            auto& desktop = Desktop::getInstance();
             const auto localBounds = component.getLocalBounds();
-            const auto globalArea = component.getScreenBounds() * desktop.getGlobalScaleFactor();
+            const auto logicalArea = component.getScreenBounds();
 
            #if JUCE_MAC
+            const auto globalArea = detail::ScalingHelpers::scaledScreenPosToUnscaled (component, logicalArea);
+
             updateScreen();
 
             const auto displayScale = std::invoke ([this]
@@ -467,8 +468,15 @@ public:
             });
 
             const auto newArea = globalArea.withZeroOrigin() * displayScale;
-           #else
+           #elif JUCE_WINDOWS || JUCE_LINUX || JUCE_BSD
+            const auto globalArea = detail::ScalingHelpers::scaledScreenPosToUnscaled (component, logicalArea);
             const auto newArea = (globalArea.toFloat() * peer->getPlatformScaleFactor()).withZeroOrigin().toNearestInt();
+           #elif JUCE_IOS || JUCE_ANDROID
+            auto& desktop = Desktop::getInstance();
+            const auto& displays = desktop.getDisplays();
+            const auto physicalTopLeft = displays.logicalToPhysical (logicalArea.getTopLeft().toFloat());
+            const auto physicalBottomRight = displays.logicalToPhysical (logicalArea.getBottomRight().toFloat());
+            const auto newArea = Rectangle { physicalTopLeft, physicalBottomRight }.withZeroOrigin().toNearestInt();
            #endif
 
             // On Windows some hosts (Pro Tools 2022.7) do not take the current DPI into account
@@ -494,7 +502,7 @@ public:
                 transform = AffineTransform::scale ((float) newArea.getWidth()  / (float) localBounds.getWidth(),
                                                     (float) newArea.getHeight() / (float) localBounds.getHeight());
 
-                nativeContext->updateWindowPosition (peer->getAreaCoveredBy (component));
+                nativeContext->updateWindowPosition();
                 invalidateAll();
             });
         }
@@ -1116,8 +1124,7 @@ public:
             if (auto* c = CachedImage::get (comp))
                 c->handleResize();
 
-            if (auto* peer = comp.getTopLevelComponent()->getPeer())
-                context.nativeContext->updateWindowPosition (peer->getAreaCoveredBy (comp));
+            context.nativeContext->updateWindowPosition();
         }
     }
 

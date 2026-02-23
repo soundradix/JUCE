@@ -193,60 +193,11 @@ FileSearchPath VSTPluginFormatHeadless::getDefaultLocationsToSearch()
    #endif
 }
 
-const XmlElement* VSTPluginFormatHeadless::getVSTXML (AudioPluginInstance* plugin)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        if (vst->vstModule != nullptr)
-            return vst->vstModule->vstXml.get();
-
-    return nullptr;
-}
-
-bool VSTPluginFormatHeadless::loadFromFXBFile (AudioPluginInstance* plugin, const void* data, size_t dataSize)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        return vst->loadFromFXBFile (data, dataSize);
-
-    return false;
-}
-
-bool VSTPluginFormatHeadless::saveToFXBFile (AudioPluginInstance* plugin, MemoryBlock& dest, bool asFXB)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        return vst->saveToFXBFile (dest, asFXB);
-
-    return false;
-}
-
-bool VSTPluginFormatHeadless::getChunkData (AudioPluginInstance* plugin, MemoryBlock& result, bool isPreset)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        return vst->getChunkData (result, isPreset, 128);
-
-    return false;
-}
-
-bool VSTPluginFormatHeadless::setChunkData (AudioPluginInstance* plugin, const void* data, int size, bool isPreset)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        return vst->setChunkData (data, size, isPreset);
-
-    return false;
-}
-
 AudioPluginInstance* VSTPluginFormatHeadless::createCustomVSTFromMainCall (void* entryPointFunction,
                                                                            double initialSampleRate,
                                                                            int initialBufferSize)
 {
     return createCustomVSTFromMainCallImpl<VSTPluginInstanceHeadless> (entryPointFunction, initialSampleRate, initialBufferSize).release();
-}
-
-void VSTPluginFormatHeadless::setExtraFunctions (AudioPluginInstance* plugin, ExtraFunctions* functions)
-{
-    std::unique_ptr<ExtraFunctions> f (functions);
-
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        std::swap (vst->extraFunctions, f);
 }
 
 AudioPluginInstance* VSTPluginFormatHeadless::getPluginInstanceFromVstEffectInterface (void* aEffect)
@@ -256,19 +207,6 @@ AudioPluginInstance* VSTPluginFormatHeadless::getPluginInstanceFromVstEffectInte
             return dynamic_cast<AudioPluginInstance*> (instanceVST);
 
     return nullptr;
-}
-
-pointer_sized_int JUCE_CALLTYPE VSTPluginFormatHeadless::dispatcher (AudioPluginInstance* plugin,
-                                                                     int32 opcode,
-                                                                     int32 index,
-                                                                     pointer_sized_int value,
-                                                                     void* ptr,
-                                                                     float opt)
-{
-    if (auto* vst = dynamic_cast<VSTPluginInstanceHeadless*> (plugin))
-        return vst->dispatch (opcode, index, value, ptr, opt);
-
-    return {};
 }
 
 void VSTPluginFormatHeadless::aboutToScanVSTShellPlugin (const PluginDescription&) {}

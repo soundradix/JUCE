@@ -469,7 +469,7 @@ private:
         : Typeface (name, style),
           doCache (cache),
           javaFont (std::move (javaFontIn)),
-          native (std::make_unique<Native> (TypefaceNativeOptions { std::move (fontIn), nonPortableMetricsIn, this }))
+          native (std::make_unique<Native> (TypefaceNativeOptions { fontIn, nonPortableMetricsIn, this }))
     {
         if (doCache == DoCache::yes)
             if (auto* c = MemoryFontCache::getInstance())

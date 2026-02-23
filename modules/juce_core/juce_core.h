@@ -225,6 +225,7 @@ namespace juce
     class FileInputStream;
     class FileOutputStream;
     class XmlElement;
+    class NamedValue;
 
     extern JUCE_API bool JUCE_CALLTYPE juce_isRunningUnderDebugger() noexcept;
     extern JUCE_API void JUCE_CALLTYPE logAssertion (const char* file, int line) noexcept;
@@ -276,6 +277,8 @@ JUCE_END_IGNORE_WARNINGS_MSVC
 #include "containers/juce_ElementComparator.h"
 #include "containers/juce_ArrayAllocationBase.h"
 #include "containers/juce_ArrayBase.h"
+#include "misc/juce_Functional.h"
+#include "containers/juce_Span.h"
 #include "containers/juce_Array.h"
 #include "containers/juce_LinkedListPointer.h"
 #include "misc/juce_ScopeGuard.h"
@@ -296,8 +299,6 @@ JUCE_END_IGNORE_WARNINGS_MSVC
 #include "text/juce_TextDiff.h"
 #include "text/juce_LocalisedStrings.h"
 #include "text/juce_Base64.h"
-#include "misc/juce_Functional.h"
-#include "containers/juce_Span.h"
 #include "misc/juce_Result.h"
 #include "misc/juce_Uuid.h"
 #include "misc/juce_ConsoleApplication.h"

@@ -1787,13 +1787,13 @@ std::optional<unsigned long> XWindowSystem::setBounds (::Window windowH, Rectang
             X11Symbols::getInstance()->xSetWMNormalHints (display, windowH, hints.get());
         }
 
-        const auto nativeWindowBorder = [&]() -> BorderSize<int>
+        const auto nativeWindowBorder = std::invoke ([&]() -> BorderSize<int>
         {
             if (const auto& frameSize = peer->getFrameSizeIfPresent())
                 return frameSize->multipliedBy (peer->getPlatformScaleFactor());
 
             return {};
-        }();
+        });
 
         const auto serial = X11Symbols::getInstance()->xNextRequest (display);
         X11Symbols::getInstance()->xMoveResizeWindow (display, windowH,
@@ -1883,8 +1883,8 @@ void XWindowSystem::updateConstraints (::Window windowH, ComponentPeer& peer) co
     {
         if ((peer.getStyleFlags() & ComponentPeer::windowIsResizable) == 0)
         {
-            hints->min_width  = hints->max_width  = peer.getBounds().getWidth();
-            hints->min_height = hints->max_height = peer.getBounds().getHeight();
+            hints->min_width  = hints->max_width  = (int) (peer.getPlatformScaleFactor() * peer.getBounds().getWidth());
+            hints->min_height = hints->max_height = (int) (peer.getPlatformScaleFactor() * peer.getBounds().getHeight());
             hints->flags = PMinSize | PMaxSize;
         }
         else if (auto* c = peer.getConstrainer())
@@ -2634,11 +2634,12 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
                                                                     [] (XRRCrtcInfo* ci) { X11Symbols::getInstance()->xRRFreeCrtcInfo (ci); }))
                                     {
                                         Displays::Display d;
-                                        d.totalArea = { crtc->x, crtc->y, (int) crtc->width, (int) crtc->height };
+                                        d.physicalBounds = { crtc->x, crtc->y, (int) crtc->width, (int) crtc->height };
+                                        d.logicalBounds = d.physicalBounds.toFloat();
                                         d.isMain = (mainDisplay == screens->outputs[j]) && (i == 0);
                                         d.dpi = DisplayHelpers::getDisplayDPI (display, 0);
 
-                                        d.verticalFrequencyHz = [&]() -> std::optional<double>
+                                        d.verticalFrequencyHz = std::invoke ([&]() -> std::optional<double>
                                         {
                                             if (crtc->mode != None)
                                             {
@@ -2652,7 +2653,7 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
                                             }
 
                                             return {};
-                                        }();
+                                        });
 
                                         // The raspberry pi returns a zero sized display, so we need to guard for divide-by-zero
                                         if (output->mm_width > 0 && output->mm_height > 0)
@@ -2695,8 +2696,8 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
                 if (screens[j].screen_number == index)
                 {
                     Displays::Display d;
-                    d.totalArea = { screens[j].x_org, screens[j].y_org,
-                                    screens[j].width, screens[j].height };
+                    d.physicalBounds = { screens[j].x_org, screens[j].y_org, screens[j].width, screens[j].height };
+                    d.logicalBounds = d.physicalBounds.toFloat();
                     d.isMain = (index == 0);
                     d.scale = masterScale;
                     d.dpi = DisplayHelpers::getDisplayDPI (display, 0); // (all screens share the same DPI)
@@ -2726,7 +2727,8 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
                 {
                     Displays::Display d;
 
-                    d.totalArea = workArea;
+                    d.physicalBounds = workArea;
+                    d.logicalBounds = d.physicalBounds.toFloat();
                     d.isMain = displays.isEmpty();
                     d.scale = masterScale;
                     d.dpi = DisplayHelpers::getDisplayDPI (display, i);
@@ -2739,8 +2741,9 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
         if (displays.isEmpty())
         {
             Displays::Display d;
-            d.totalArea = { X11Symbols::getInstance()->xDisplayWidth  (display, X11Symbols::getInstance()->xDefaultScreen (display)),
-                            X11Symbols::getInstance()->xDisplayHeight (display, X11Symbols::getInstance()->xDefaultScreen (display)) };
+            d.physicalBounds = { X11Symbols::getInstance()->xDisplayWidth  (display, X11Symbols::getInstance()->xDefaultScreen (display)),
+                                 X11Symbols::getInstance()->xDisplayHeight (display, X11Symbols::getInstance()->xDefaultScreen (display)) };
+            d.logicalBounds = d.physicalBounds.toFloat();
             d.isMain = true;
             d.scale = masterScale;
             d.dpi = DisplayHelpers::getDisplayDPI (display, 0);
@@ -2750,7 +2753,7 @@ Array<Displays::Display> XWindowSystem::findDisplays (float masterScale) const
     }
 
     for (auto& d : displays)
-        d.userArea = d.totalArea; // JUCE currently does not support requesting the user area on Linux
+        d.userBounds = d.logicalBounds; // JUCE currently does not support requesting the user area on Linux
 
     return displays;
 }
