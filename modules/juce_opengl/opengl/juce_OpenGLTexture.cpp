@@ -36,7 +36,7 @@ namespace juce
 {
 
 OpenGLTexture::OpenGLTexture()
-    : textureID (0), width (0), height (0), flipped (false), ownerContext (nullptr)
+    : flipped(false), textureID(0), width(0), height(0), ownerContext(nullptr)
 {
 }
 
