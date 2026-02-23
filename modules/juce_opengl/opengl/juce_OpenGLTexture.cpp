@@ -27,7 +27,7 @@ namespace juce
 {
 
 OpenGLTexture::OpenGLTexture()
-    : textureID (0), width (0), height (0), flipped (false), ownerContext (nullptr)
+    : flipped(false), textureID(0), width(0), height(0), ownerContext(nullptr)
 {
 }
 
@@ -143,6 +143,7 @@ void OpenGLTexture::loadImage (const Image& image)
     {
         case Image::RGB:            Flipper<PixelRGB>  ::flip (dataCopy, srcData.data, srcData.lineStride, imageW, imageH); break;
         case Image::SingleChannel:  Flipper<PixelAlpha>::flip (dataCopy, srcData.data, srcData.lineStride, imageW, imageH); break;
+        case Image::ARGB:
         case Image::UnknownFormat:
         default: break;
     }
