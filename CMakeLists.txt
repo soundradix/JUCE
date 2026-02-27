@@ -177,6 +177,9 @@ install(FILES "${JUCE_BINARY_DIR}/JUCEConfigVersion.cmake"
               "${JUCE_CMAKE_UTILS_DIR}/juce_LinuxSubprocessHelper.cpp"
         DESTINATION "${JUCE_INSTALL_DESTINATION}")
 
+install(DIRECTORY "${JUCE_CMAKE_UTILS_DIR}/juce_vst3_helper"
+        DESTINATION "${JUCE_INSTALL_DESTINATION}")
+
 if(("${CMAKE_SOURCE_DIR}" STREQUAL "${JUCE_SOURCE_DIR}") AND (NOT JUCE_BUILD_HELPER_TOOLS))
     _juce_add_lv2_manifest_helper_target()
 

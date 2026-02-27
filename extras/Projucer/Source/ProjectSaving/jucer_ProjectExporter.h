@@ -272,10 +272,9 @@ public:
 
     build_tools::RelativePath getVST3HelperProgramSource() const
     {
-        const auto suffix = isOSX() ? "mm" : "cpp";
         return getModuleFolderRelativeToProject ("juce_audio_plugin_client")
                .getChildFile ("VST3")
-               .getChildFile (String ("juce_VST3ManifestHelper.") + suffix);
+               .getChildFile ("juce_VST3ManifestHelper.cpp");
     }
 
     //==============================================================================

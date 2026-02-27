@@ -899,7 +899,17 @@ public:
             projectXml.setAttribute ("ToolsVersion", getOwner().getToolsVersion());
             projectXml.setAttribute ("xmlns", "http://schemas.microsoft.com/developer/msbuild/2003");
 
-            const auto allArchitectures = owner.getAllActiveArchitectures();
+            auto allArchitectures = owner.getAllActiveArchitectures();
+
+            if (type == VST3Helper)
+            {
+                // Independent of the architectures supported by the project,
+                // the VST3 helper target should only be built for 32-bit as
+                // this can be used to run on all supported platforms.
+
+                allArchitectures.clearQuick();
+                allArchitectures.add (Architecture::win32);
+            }
 
             {
                 auto* configsGroup = projectXml.createNewChildElement ("ItemGroup");
@@ -1160,7 +1170,7 @@ public:
                                                   : String();
 
                     auto librarySearchPaths = config.getLibrarySearchPaths();
-                    auto additionalLibraryDirs = type != SharedCodeTarget && type != LV2Helper && type != VST3Helper && librarySearchPaths.size() > 0
+                    auto additionalLibraryDirs = type != SharedCodeTarget && type != LV2Helper && type != VST3Helper && ! librarySearchPaths.isEmpty()
                                                  ? getOwner().replacePreprocessorTokens (config, librarySearchPaths.joinIntoString (";")) + ";%(AdditionalLibraryDirectories)"
                                                  : String();
 
@@ -1635,6 +1645,9 @@ public:
 
         String getSolutionTargetPath (const BuildConfiguration& config) const
         {
+            if (type == VST3Helper)
+                return "$(SolutionDir)Win32\\$(Configuration)";
+
             auto binaryPath = config.getTargetBinaryRelativePathString().trim();
             if (binaryPath.isEmpty())
                 return "$(SolutionDir)$(Platform)\\$(Configuration)";
@@ -1872,94 +1885,45 @@ public:
             {
                 const auto segments = getVst3BundleStructure (config, arch);
 
-                const auto manifestScript = [&]() -> String
+                const auto manifestScript = std::invoke ([&]() -> String
                 {
-                    const auto* writerTarget = [&]() -> MSVCTarget*
+                    const auto* helperTarget = std::invoke ([&]() -> MSVCTarget*
                     {
                         for (auto* target : owner.targets)
                             if (target->type == VST3Helper)
                                 return target;
 
                         return nullptr;
-                    }();
+                    });
 
-                    if (writerTarget == nullptr)
+                    // There should always be a helper target for a VST3 plugin!
+                    jassert (helperTarget != nullptr);
+
+                    if (helperTarget == nullptr)
                         return "";
 
-                    const auto helperExecutablePath = writerTarget->getExpandedConfigTargetPath (config)
-                                                    + "\\"
-                                                    + writerTarget->getBinaryNameWithSuffix (config);
+                    const auto helperPath = helperTarget->getExpandedConfigTargetPath (config)
+                                          + "\\"
+                                          + helperTarget->getBinaryNameWithSuffix (config);
 
-                    {
-                        const auto normalisedBundlePath = getOwner().getOutDirFile (config, segments[0]);
-                        const auto contentsDir = normalisedBundlePath + "\\Contents";
-                        const auto resourceDir = contentsDir + "\\Resources";
-                        const auto manifestPath = (resourceDir + "\\moduleinfo.json");
-                        const auto resourceDirPath = resourceDir + "\\";
-                        const auto pluginName = getOwner().project.getPluginNameString();
+                    const auto normalisedBundlePath = getOwner().getOutDirFile (config, segments[0]);
+                    const auto contentsDir = normalisedBundlePath + "\\Contents";
+                    const auto resourceDir = contentsDir + "\\Resources";
+                    const auto manifestPath = resourceDir + "\\moduleinfo.json";
+                    const auto resourceDirPath = resourceDir + "\\";
 
-                        const auto manifestInvocationString = StringArray
-                        {
-                            helperExecutablePath.quoted(),
-                            ">",
-                            manifestPath.quoted()
-                        }.joinIntoString (" ");
+                    const auto manifestInvocationString = helperPath.quoted()
+                                                        + " > "
+                                                        + manifestPath.quoted();
 
-                        const auto crossCompilationPairs =
-                        {
-                            // This catches ARM64 and EC for x64 manifest generation
-                            std::pair { Architecture::arm64, Architecture::win64 },
-                            std::pair { arch, arch }
-                        };
-
-                        Builder builder;
-
-                        builder.set ("manifest_generated", 0);
-
-                        for (auto [hostArch, targetArch] : crossCompilationPairs)
-                        {
-                            const StringArray expr
-                            {
-                                "\"$(PROCESSOR_ARCHITECTURE)\" == " + getVisualStudioArchitectureId (hostArch).quoted(),
-                                "\"$(Platform)\""            " == " + getVisualStudioPlatformId (targetArch).quoted()
-                            };
-
-                            builder.ifAllConditionsTrue (expr, Builder{}.call ("_generate_manifest")
-                                                                        .set ("manifest_generated", 1));
-                        }
-
-                        const auto archMismatchErrorString = StringArray
-                        {
-                            "VST3 manifest generation is disabled for",
-                            pluginName,
-                            "because a",
-                            getVisualStudioArchitectureId (arch),
-                            "manifest helper cannot run on a host system",
-                            "processor detected to be $(PROCESSOR_ARCHITECTURE)."
-                        }.joinIntoString (" ");
-
-                        const auto architectureMatched = Builder{}
-                            .ifelse ("exist " + manifestPath.quoted(),
-                                     Builder{}.deleteFile (manifestPath.quoted()))
-                            .ifelse ("not exist "  + resourceDirPath.quoted(),
-                                     Builder{}.mkdir (resourceDirPath.quoted()))
-                            .runAndCheck (manifestInvocationString,
-                                          Builder{}.info ("Successfully generated a manifest for " + pluginName)
-                                                   .jump ("_continue"),
-                                          Builder{}.info ("The manifest helper failed")
-                                                   .jump ("_continue"));
-
-                        builder.ifelse ("%manifest_generated% equ 0",
-                                        Builder{}.jump ("_arch_mismatch"));
-
-                        builder.jump ("_continue");
-                        builder.labelledSection ("_generate_manifest", architectureMatched);
-                        builder.labelledSection ("_arch_mismatch",     Builder{}.info (archMismatchErrorString));
-                        builder.labelledSection ("_continue", "");
-
-                        return builder.build();
-                    }
-                }();
+                    return Builder{}
+                        .ifelse ("exist " + manifestPath.quoted(),
+                                 Builder{}.deleteFile (manifestPath.quoted()))
+                        .ifelse ("not exist " + resourceDirPath.quoted(),
+                                 Builder{}.mkdir (resourceDirPath.quoted()))
+                        .run (manifestInvocationString, true)
+                        .build();
+                });
 
                 const auto pkgScript = copyBuildOutputIntoBundle (segments);
                 const auto copyScript = copyBundleToInstallDirectory (segments, config.getBinaryPath (Ids::vst3BinaryLocation, arch));
@@ -2068,32 +2032,6 @@ public:
             return builder.build();
         }
 
-        static String generateToolchainValidatorScript (Architecture arch)
-        {
-            MSVCScriptBuilder builder;
-
-            if (arch == Architecture::win64)
-            {
-                const auto x86ToolchainErrorMessage =
-                    "echo : Warning: Toolchain configuration issue!"
-                    " You are using a 32-bit toolchain to compile a 64-bit target on a 64-bit system."
-                    " This may cause problems with the build system."
-                    " To resolve this, use the x64 version of MSBuild. You can invoke it directly at:"
-                    " \"<VisualStudioPathHere>/MSBuild/Current/Bin/amd64/MSBuild.exe\""
-                    " Or, use the \"x64 Native Tools Command Prompt\" script.";
-
-                builder.ifAllConditionsTrue (
-                {
-                    "\"$(PROCESSOR_ARCHITECTURE)\" == " + getVisualStudioArchitectureId (Architecture::win32).quoted(),
-
-                    // This only exists if the process is x86 but the host is x64.
-                    "defined PROCESSOR_ARCHITEW6432"
-                }, MSVCScriptBuilder{}.append (x86ToolchainErrorMessage));
-            }
-
-            return builder.build();
-        }
-
         String getExtraPreBuildSteps (const MSVCBuildConfiguration& config, Architecture arch) const
         {
             const auto createBundleStructure = [&] (const StringArray& segments)
@@ -2116,7 +2054,6 @@ public:
             MSVCScriptBuilder builder;
 
             builder.append (generatePluginCopyStepPathValidatorScript (type, config, arch));
-            builder.append (generateToolchainValidatorScript (arch));
 
             if (type == LV2PlugIn)
             {
@@ -2641,14 +2578,17 @@ protected:
                 // We have to do this as VS will automatically add the entry anyway.
                 for (const auto& arch : allArchitectures)
                 {
-                    auto configName = config.createMSVCConfigName (arch);
+                    const auto isVst3HelperTarget = target->type == MSVCTarget::VST3Helper;
+                    const auto solutionConfigName = config.createMSVCConfigName (arch);
+                    const auto buildConfigName = config.createMSVCConfigName (isVst3HelperTarget ? Architecture::win32 : arch);
 
-                    out << "\t\t" << target->getProjectGuid() << "." << configName << "." << "ActiveCfg" << " = " << configName << newLine;
+                    out << "\t\t" << target->getProjectGuid() << "." << solutionConfigName << "." << "ActiveCfg" << " = " << buildConfigName << newLine;
 
-                    const auto shouldBuild = config.shouldBuildTarget (target->type, arch) && config.getArchitectures().contains (arch);
+                    const auto shouldBuild = isVst3HelperTarget
+                                          || (config.shouldBuildTarget (target->type, arch) && config.getArchitectures().contains (arch));
 
                     if (shouldBuild)
-                        out << "\t\t" << target->getProjectGuid() << "." << configName << "." << "Build.0" << " = " << configName << newLine;
+                        out << "\t\t" << target->getProjectGuid() << "." << solutionConfigName << "." << "Build.0" << " = " << buildConfigName << newLine;
                 }
             }
         }
