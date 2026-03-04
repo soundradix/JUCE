@@ -731,7 +731,7 @@ namespace AAXClasses
 #if JucePlugin_Enable_ARA
             void resized() override
             {
-                if (auto* araEditor = dynamic_cast<juce::AudioProcessorEditorARAExtension*> (pluginEditor.get()))
+                if (dynamic_cast<juce::AudioProcessorEditorARAExtension*> (pluginEditor.get()))
                     pluginEditor->setBounds (getLocalBounds());
             }
 #endif
