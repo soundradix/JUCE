@@ -116,6 +116,7 @@ public:
 
     //==============================================================================
 #if ARA_VALIDATE_API_CALLS
+    bool apiSupportsToggleRendering { true };
     bool isPrepared { false };
 #endif
 

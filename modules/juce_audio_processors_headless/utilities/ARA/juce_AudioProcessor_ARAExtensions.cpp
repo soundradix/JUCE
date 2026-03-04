@@ -131,7 +131,12 @@ void AudioProcessorARAExtension::didBindToARA() noexcept
 #if ARA_VALIDATE_API_CALLS
     ARA_VALIDATE_API_STATE (! isPrepared);
     if (auto playbackRenderer = getPlaybackRenderer())
+    {
         playbackRenderer->araExtension = this;
+        if (auto* processor = (juce::AudioProcessor*)playbackRenderer) {
+            apiSupportsToggleRendering = processor->wrapperType != AudioProcessor::wrapperType_AAX;
+        }
+    }
 #endif
 
 #if JUCE_ASSERTIONS_ENABLED_OR_LOGGED
