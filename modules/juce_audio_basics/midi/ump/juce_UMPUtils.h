@@ -75,7 +75,7 @@ struct Utils
 
         static constexpr uint8_t get (uint32_t word)
         {
-            return (word >> shift) & 0xf;
+            return (uint8_t) ((word >> shift) & 0xf);
         }
     };
 
@@ -94,7 +94,7 @@ struct Utils
 
         static constexpr uint8_t get (uint32_t word)
         {
-            return (word >> shift) & 0xff;
+            return (uint8_t) ((word >> shift) & 0xff);
         }
     };
 
