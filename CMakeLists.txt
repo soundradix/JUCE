@@ -85,9 +85,9 @@ juce_disable_default_flags()
 
 add_subdirectory(extras/Build)
 
-# If you want to build the JUCE examples with VST2/AAX/ARA support, you'll need to make the
-# VST2/AAX/ARA headers visible to the juce_audio_processors module. You can either set the paths on
-# the command line, (e.g. -DJUCE_GLOBAL_AAX_SDK_PATH=/path/to/sdk) if you're just building the JUCE
+# If you want to build the JUCE examples with VST2/ARA support, you'll need to make the
+# VST2/ARA headers visible to the juce_audio_processors module. You can either set the paths on
+# the command line, (e.g. -DJUCE_GLOBAL_ARA_SDK_PATH=/path/to/sdk) if you're just building the JUCE
 # examples, or you can call the `juce_set_*_sdk_path` functions in your own CMakeLists after
 # importing JUCE.
 
