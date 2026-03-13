@@ -255,7 +255,7 @@ void AudioDeviceManager::audioDeviceListChanged()
 {
     if (currentAudioDevice != nullptr)
     {
-        auto currentDeviceStillAvailable = [&]
+        auto currentDeviceStillAvailable = std::invoke ([&]
         {
             auto currentTypeName = currentAudioDevice->getTypeName();
             auto currentDeviceName = currentAudioDevice->getName();
@@ -275,7 +275,7 @@ void AudioDeviceManager::audioDeviceListChanged()
             }
 
             return false;
-        }();
+        });
 
         if (! currentDeviceStillAvailable)
         {
