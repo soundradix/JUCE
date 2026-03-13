@@ -45,6 +45,12 @@ template <typename CFType>
 using CFUniquePtr = std::unique_ptr<CFRemoveRef<CFType>, CFObjectDeleter>;
 
 template <typename CFType>
+auto makeCFUniquePtr (CFType instance)
+{
+    return CFUniquePtr<CFType> { instance };
+}
+
+template <typename CFType>
 struct CFObjectHolder
 {
     CFObjectHolder() = default;
