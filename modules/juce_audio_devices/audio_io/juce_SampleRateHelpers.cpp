@@ -19,7 +19,7 @@
 namespace juce::SampleRateHelpers
 {
 
-static inline const std::vector<double>& getAllSampleRates()
+static inline const std::vector<double>& getCommonSampleRates()
 {
     static auto sampleRates = std::invoke ([]
     {

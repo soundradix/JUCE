@@ -49,7 +49,7 @@ static void getDeviceSampleRates (snd_pcm_t* handle, Array<double>& rates)
     snd_pcm_hw_params_t* hwParams;
     snd_pcm_hw_params_alloca (&hwParams);
 
-    for (const auto rateToTry : SampleRateHelpers::getAllSampleRates())
+    for (const auto rateToTry : SampleRateHelpers::getCommonSampleRates())
     {
         if (snd_pcm_hw_params_any (handle, hwParams) >= 0
              && snd_pcm_hw_params_test_rate (handle, hwParams, (unsigned int) rateToTry, 0) == 0)

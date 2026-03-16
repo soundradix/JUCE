@@ -679,7 +679,7 @@ private:
 
     void querySupportedSampleRates (WAVEFORMATEXTENSIBLE format, ComSmartPtr<IAudioClient>& audioClient)
     {
-        for (auto rate : SampleRateHelpers::getAllSampleRates())
+        for (auto rate : SampleRateHelpers::getCommonSampleRates())
         {
             if (rates.contains (rate))
                 continue;

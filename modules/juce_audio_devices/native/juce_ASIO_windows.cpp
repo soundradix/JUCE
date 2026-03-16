@@ -349,7 +349,7 @@ public:
         Array<double> newRates;
 
         if (asioObject != nullptr)
-            for (const auto rate : SampleRateHelpers::getAllSampleRates())
+            for (const auto rate : SampleRateHelpers::getCommonSampleRates())
                 if (asioObject->canSampleRate (rate) == 0)
                     newRates.add (rate);
 
