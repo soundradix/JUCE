@@ -512,16 +512,25 @@ struct CoreMidiHelpers
         {
             JUCE_ASSERT_MESSAGE_THREAD
 
-            enableSimulatorMidiSession();
+            static auto clientRef = std::invoke ([]() -> std::optional<MIDIClientRef>
+            {
+                enableSimulatorMidiSession();
 
-            const auto name = ump::Endpoints::Impl::getGlobalMidiClientName();
-            CFUniquePtr<CFStringRef> cfName (name.toCFString());
-            MIDIClientRef clientRef{};
+                const auto name = ump::Endpoints::Impl::getGlobalMidiClientName();
+                CFUniquePtr<CFStringRef> cfName (name.toCFString());
 
-            if (! JUCE_CHECK_ERROR (MIDIClientCreate (cfName.get(), systemChangeCallback, nullptr, &clientRef)))
+                MIDIClientRef midiClientRef{};
+
+                if (! JUCE_CHECK_ERROR (MIDIClientCreate (cfName.get(), systemChangeCallback, nullptr, &midiClientRef)))
+                    return {};
+
+                return midiClientRef;
+            });
+
+            if (! clientRef.has_value())
                 return nullptr;
 
-            const std::shared_ptr<SharedEndpointsImplNative> result { new SharedEndpointsImplNative (clientRef, listener) };
+            const std::shared_ptr<SharedEndpointsImplNative> result { new SharedEndpointsImplNative (*clientRef, listener) };
             Listeners::get().add (result);
             return result;
         }
