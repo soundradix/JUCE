@@ -406,7 +406,6 @@ class HiResCounterHandler
 {
 public:
     HiResCounterHandler()
-        : hiResTicksOffset (0)
     {
         // This macro allows you to override the default timer-period
         // used on Windows. By default this is set to 1, because that has
@@ -428,23 +427,23 @@ public:
         LARGE_INTEGER f;
         QueryPerformanceFrequency (&f);
         hiResTicksPerSecond = f.QuadPart;
-        hiResTicksScaleFactor = 1000.0 / (double) hiResTicksPerSecond;
+        hiResMillisecondsPerTick = 1'000.0 / (double) hiResTicksPerSecond;
     }
 
     inline int64 getHighResolutionTicks() noexcept
     {
         LARGE_INTEGER ticks;
         QueryPerformanceCounter (&ticks);
-        return ticks.QuadPart + hiResTicksOffset;
+        return ticks.QuadPart;
     }
 
     inline double getMillisecondCounterHiRes() noexcept
     {
-        return (double) getHighResolutionTicks() * hiResTicksScaleFactor;
+        return (double) getHighResolutionTicks() * hiResMillisecondsPerTick;
     }
 
-    int64 hiResTicksPerSecond, hiResTicksOffset;
-    double hiResTicksScaleFactor;
+    int64 hiResTicksPerSecond;
+    double hiResMillisecondsPerTick;
 };
 
 static HiResCounterHandler hiResCounterHandler;

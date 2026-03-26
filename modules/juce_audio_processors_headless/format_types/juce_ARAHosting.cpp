@@ -350,6 +350,7 @@ public:
                 return ARAHostModel::PlugInExtensionInstance { araEntryPoint->bindToDocumentControllerWithRoles (documentController.getRef(), knownRoles, assignedRoles) };
         }
 
+       #if JUCE_INTERNAL_HAS_AU
         if (auto* auClient = instance.getAudioUnitClient())
         {
             auto audioUnit = auClient->getAudioUnitHandle();
@@ -377,6 +378,7 @@ public:
                 return ARAHostModel::PlugInExtensionInstance { audioUnitBinding.outPlugInExtension };
             }
         }
+       #endif
 
         jassertfalse;
         return {};

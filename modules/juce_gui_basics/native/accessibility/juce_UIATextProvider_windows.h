@@ -110,7 +110,7 @@ public:
         {
             SafeArrayHandle result { SafeArrayCreateVector (VT_UNKNOWN, 0, 1) };
 
-            if (pRetVal == nullptr)
+            if (result == nullptr)
                 return E_FAIL;
 
             ComSmartPtr rangeProvider { new UIATextRangeProvider (*this, { 0, textInterface.getTotalNumCharacters() }),

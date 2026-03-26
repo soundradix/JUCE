@@ -77,7 +77,7 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wc++98-compat-extra-semi",
                                      "-Wsign-conversion",
                                      "-Wzero-as-null-pointer-constant")
 
-JUCE_BEGIN_IGNORE_WARNINGS_MSVC (6387 6031)
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4100 6031 6387)
 
 #ifndef NOMINMAX
  #define NOMINMAX

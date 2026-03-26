@@ -814,7 +814,7 @@ public:
 
         if (editorComp == nullptr)
         {
-            if (auto* ed = processor->createEditorIfNeeded())
+            if (auto* ed = processor->createEditorAndMakeActive())
             {
                 setHasEditorFlag (true);
                 editorComp.reset (new EditorCompWrapper (*this, *ed));
@@ -1415,7 +1415,12 @@ private:
     pointer_sized_int handleSetCurrentProgramName (VstOpCodeArguments args)
     {
         if (processor != nullptr && processor->getNumPrograms() > 0)
-            processor->changeProgramName (processor->getCurrentProgram(), (char*) args.ptr);
+        {
+            const auto begin = (char*) args.ptr;
+            const String newName { CharPointer_UTF8 { begin },
+                                   CharPointer_UTF8 { begin + Vst2::kVstMaxProgNameLen + 1 } };
+            processor->changeProgramName (processor->getCurrentProgram(), newName);
+        }
 
         return 0;
     }
@@ -1423,7 +1428,7 @@ private:
     pointer_sized_int handleGetCurrentProgramName (VstOpCodeArguments args)
     {
         if (processor != nullptr && processor->getNumPrograms() > 0)
-            processor->getProgramName (processor->getCurrentProgram()).copyToUTF8 ((char*) args.ptr, 24 + 1);
+            processor->getProgramName (processor->getCurrentProgram()).copyToUTF8 ((char*) args.ptr, Vst2::kVstMaxProgNameLen + 1);
 
         return 0;
     }
@@ -1637,7 +1642,7 @@ private:
     {
         if (processor != nullptr && isPositiveAndBelow (args.index, processor->getNumPrograms()))
         {
-            processor->getProgramName (args.index).copyToUTF8 ((char*) args.ptr, 24 + 1);
+            processor->getProgramName (args.index).copyToUTF8 ((char*) args.ptr, Vst2::kVstMaxProgNameLen + 1);
             return 1;
         }
 

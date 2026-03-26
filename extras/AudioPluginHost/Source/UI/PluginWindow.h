@@ -289,7 +289,7 @@ private:
         if (type == PluginWindow::Type::normal)
         {
             if (processor.hasEditor())
-                if (auto* ui = processor.createEditorIfNeeded())
+                if (auto* ui = processor.createEditorAndMakeActive())
                     return ui;
 
             type = PluginWindow::Type::generic;

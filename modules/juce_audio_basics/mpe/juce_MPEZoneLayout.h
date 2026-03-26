@@ -81,7 +81,8 @@ struct MPEZone
 
     bool isUsing (int channel) const noexcept
     {
-        return isUsingChannelAsMemberChannel (channel) || channel == getMasterChannel();
+        return isActive()
+               && (channel == getMasterChannel() || isUsingChannelAsMemberChannel (channel));
     }
 
     bool operator== (const MPEZone& other) const;

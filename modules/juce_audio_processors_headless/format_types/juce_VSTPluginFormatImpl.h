@@ -188,7 +188,7 @@ namespace
         return (double) micro.tv_usec * 1000.0;
        #elif JUCE_MAC
         UnsignedWide micro;
-        Microseconds (&micro);
+        ::Microseconds (&micro);
         return micro.lo * 1000.0;
        #endif
     }

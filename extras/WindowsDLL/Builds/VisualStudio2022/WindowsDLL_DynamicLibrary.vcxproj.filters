@@ -5679,6 +5679,12 @@
     <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_Time.h">
       <Filter>JUCE Modules\juce_core\time</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_TimedDiagnostic.h">
+      <Filter>JUCE Modules\juce_core\time</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_TimeUnits.h">
+      <Filter>JUCE Modules\juce_core\time</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\..\..\modules\juce_core\unit_tests\juce_UnitTest.h">
       <Filter>JUCE Modules\juce_core\unit_tests</Filter>
     </ClInclude>
@@ -7921,6 +7927,9 @@
     </None>
     <None Include="..\..\..\..\modules\juce_audio_processors_headless\format_types\VST3_SDK\public.sdk\README.md">
       <Filter>JUCE Modules\juce_audio_processors_headless\format_types\VST3_SDK\public.sdk</Filter>
+    </None>
+    <None Include="..\..\..\..\modules\juce_audio_processors_headless\format_types\VST3_SDK\JUCE_README.md">
+      <Filter>JUCE Modules\juce_audio_processors_headless\format_types\VST3_SDK</Filter>
     </None>
     <None Include="..\..\..\..\modules\juce_audio_processors_headless\format_types\VST3_SDK\LICENSE.txt">
       <Filter>JUCE Modules\juce_audio_processors_headless\format_types\VST3_SDK</Filter>

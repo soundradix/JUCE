@@ -727,8 +727,8 @@ struct ZIPTests final : public UnitTest
 
         StringArray entryNames;
 
-        for (const auto& testCase : testCases)
-            entryNames.add (testCase.first);
+        for (const auto& tc : testCases)
+            entryNames.add (tc.first);
 
         TemporaryFile tmpDir;
         tmpDir.getFile().createDirectory();

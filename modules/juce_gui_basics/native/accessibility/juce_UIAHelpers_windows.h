@@ -126,29 +126,28 @@ inline JUCE_COMRESULT addHandlersToArray (const std::vector<const AccessibilityH
 {
     auto numHandlers = handlers.size();
 
-    *pRetVal = SafeArrayCreateVector (VT_UNKNOWN, 0, (ULONG) numHandlers);
+    SafeArrayHandle result { SafeArrayCreateVector (VT_UNKNOWN, 0, (ULONG) numHandlers) };
 
-    if (pRetVal != nullptr)
+    if (result == nullptr)
+        return E_FAIL;
+
+    for (LONG i = 0; i < (LONG) numHandlers; ++i)
     {
-        for (LONG i = 0; i < (LONG) numHandlers; ++i)
-        {
-            auto* handler = handlers[(size_t) i];
+        auto* handler = handlers[(size_t) i];
 
-            if (handler == nullptr)
-                continue;
+        if (handler == nullptr)
+            continue;
 
-            ComSmartPtr<IRawElementProviderSimple> provider;
-            JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wlanguage-extension-token")
-            handler->getNativeImplementation()->QueryInterface (IID_PPV_ARGS (provider.resetAndGetPointerAddress()));
-            JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+        ComSmartPtr<IRawElementProviderSimple> provider;
+        JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wlanguage-extension-token")
+        handler->getNativeImplementation()->QueryInterface (IID_PPV_ARGS (provider.resetAndGetPointerAddress()));
+        JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 
-            auto hr = SafeArrayPutElement (*pRetVal, &i, provider);
-
-            if (FAILED (hr))
-                return E_FAIL;
-        }
+        if (FAILED (SafeArrayPutElement (result.get(), &i, provider)))
+            return E_FAIL;
     }
 
+    *pRetVal = result.release();
     return S_OK;
 }
 

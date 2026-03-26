@@ -153,7 +153,7 @@ public:
 
         private:
             InternalPlugin& self;
-            std::unique_ptr<AudioProcessorEditor> wrapped { self.inner->createEditor() };
+            std::unique_ptr<AudioProcessorEditor> wrapped { self.inner->createEditorAndMakeActive() };
         };
 
         return new Decorator { *this };

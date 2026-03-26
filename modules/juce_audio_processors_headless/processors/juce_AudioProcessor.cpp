@@ -952,7 +952,7 @@ AudioProcessorEditor* AudioProcessor::getActiveEditor() const noexcept
     return activeEditor;
 }
 
-AudioProcessorEditor* AudioProcessor::createEditorIfNeeded()
+AudioProcessorEditor* AudioProcessor::createEditorAndMakeActive()
 {
     // Don't create UI objects from non-UI threads!
     JUCE_ASSERT_MESSAGE_MANAGER_IS_LOCKED
@@ -961,7 +961,7 @@ AudioProcessorEditor* AudioProcessor::createEditorIfNeeded()
 
     if (activeEditor != nullptr)
     {
-        // There's already an active editor! Before calling createEditorIfNeeded(),
+        // There's already an active editor! Before calling createEditorAndMakeActive(),
         // you should check whether there's already an editor using getActiveEditor().
         jassertfalse;
         return nullptr;

@@ -492,7 +492,7 @@ JUCE_COMRESULT AccessibilityNativeHandle::GetRuntimeId (SAFEARRAY** pRetVal)
         SafeArrayHandle result { SafeArrayCreateVector (VT_I4, 0, 2) };
 
         if (result == nullptr)
-            return E_OUTOFMEMORY;
+            return E_FAIL;
 
         for (LONG i = 0; i < 2; ++i)
         {

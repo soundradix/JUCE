@@ -1974,7 +1974,7 @@ public:
                     if (auto* active = filter->getActiveEditor())
                         return active;
 
-                    return filter->createEditorIfNeeded();
+                    return filter->createEditorAndMakeActive();
                 });
 
                 if (editorComp == nullptr)

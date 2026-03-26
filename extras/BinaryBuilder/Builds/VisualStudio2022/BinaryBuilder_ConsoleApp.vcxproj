@@ -660,6 +660,8 @@
     <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_PerformanceCounter.h"/>
     <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_RelativeTime.h"/>
     <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_Time.h"/>
+    <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_TimedDiagnostic.h"/>
+    <ClInclude Include="..\..\..\..\modules\juce_core\time\juce_TimeUnits.h"/>
     <ClInclude Include="..\..\..\..\modules\juce_core\unit_tests\juce_UnitTest.h"/>
     <ClInclude Include="..\..\..\..\modules\juce_core\unit_tests\juce_UnitTestCategories.h"/>
     <ClInclude Include="..\..\..\..\modules\juce_core\xml\juce_XmlDocument.h"/>

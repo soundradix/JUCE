@@ -737,7 +737,7 @@ public:
 
     std::unique_ptr<AudioProcessorEditor> createEditor()
     {
-        return std::unique_ptr<AudioProcessorEditor> (processor->createEditorIfNeeded());
+        return std::unique_ptr<AudioProcessorEditor> (processor->createEditorAndMakeActive());
     }
 
     void editorBeingDeleted (AudioProcessorEditor* editor)
@@ -1366,7 +1366,8 @@ private:
         if (const auto result = prepareStream (os); ! result)
             return result;
 
-        const auto editorInstance = rawToUniquePtr (proc.createEditor());
+        const auto editorInstance = rawToUniquePtr (proc.createEditorAndMakeActive());
+        const ScopeGuard scope { [&] { proc.editorBeingDeleted (editorInstance.get()); } };
         const auto resizeFeatureString = editorInstance->isResizable() ? "ui:resize" : "ui:noUserResize";
 
         os << "@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .\n"

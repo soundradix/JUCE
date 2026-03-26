@@ -915,7 +915,7 @@ private:
                         if (auto* editor = _this (self)->getAudioProcessor().getActiveEditor())
                             return editor;
 
-                        return _this (self)->getAudioProcessor().createEditorIfNeeded();
+                        return _this (self)->getAudioProcessor().createEditorAndMakeActive();
                     };
 
                     MessageManager::callSync ([&]
@@ -1905,7 +1905,7 @@ public:
 
             if (processor.hasEditor())
             {
-                if (AudioProcessorEditor* editor = processor.createEditorIfNeeded())
+                if (auto* editor = processor.createEditorAndMakeActive())
                 {
                     preferredSize = editor->getBounds();
 

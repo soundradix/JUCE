@@ -852,7 +852,7 @@ private:
     public:
         MainContentComponent (StandaloneFilterWindow& filterWindow)
             : owner (filterWindow), notification (this),
-              editor (owner.getAudioProcessor()->hasEditor() ? owner.getAudioProcessor()->createEditorIfNeeded()
+              editor (owner.getAudioProcessor()->hasEditor() ? owner.getAudioProcessor()->createEditorAndMakeActive()
                                                              : new GenericAudioProcessorEditor (*owner.getAudioProcessor()))
         {
             inputMutedValue.referTo (owner.pluginHolder->getMuteInputValue());
