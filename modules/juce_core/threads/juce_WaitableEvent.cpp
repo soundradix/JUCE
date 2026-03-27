@@ -24,29 +24,36 @@ WaitableEvent::WaitableEvent (bool manualReset) noexcept
 {
 }
 
-bool WaitableEvent::wait (double timeOutMilliseconds) const
+void WaitableEvent::wait() const
 {
     std::unique_lock<std::mutex> lock (mutex);
 
     if (! triggered)
-    {
-        if (timeOutMilliseconds < 0.0)
-        {
-            condition.wait (lock, [this] { return triggered == true; });
-        }
-        else
-        {
-            if (! condition.wait_for (lock, std::chrono::duration<double, std::milli> { timeOutMilliseconds },
-                                      [this] { return triggered == true; }))
-            {
-                return false;
-            }
-        }
-    }
+        condition.wait (lock, [this] { return triggered == true; });
+
+    if (! useManualReset)
+        reset();
+}
+
+bool WaitableEvent::wait (Seconds timeOut) const
+{
+    std::unique_lock<std::mutex> lock (mutex);
+
+    if (! triggered && ! condition.wait_for (lock, timeOut, [this] { return triggered == true; }))
+        return false;
 
     if (! useManualReset)
         reset();
 
+    return true;
+}
+
+bool WaitableEvent::wait (double timeOutMilliseconds) const
+{
+    if (timeOutMilliseconds >= 0.0)
+        return wait (Milliseconds { timeOutMilliseconds });
+
+    wait();
     return true;
 }
 
