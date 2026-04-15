@@ -77,10 +77,11 @@
 #elif JUCE_LINUX || JUCE_BSD
  /* Got an include error here?
 
-    If you want to install OpenGL support, the packages to get are "mesa-common-dev"
-    and "freeglut3-dev".
+    If you want to install OpenGL support, the packages to get are "mesa-common-dev",
+    "freeglut3-dev", and "libegl-dev".
  */
- #include <GL/glx.h>
+ #include <EGL/egl.h>
+ #include <EGL/eglext.h>
 
 //==============================================================================
 #elif JUCE_MAC

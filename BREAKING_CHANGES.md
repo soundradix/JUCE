@@ -1,5 +1,26 @@
 # JUCE breaking changes
 
+# JUCE 9
+
+## Change
+
+JUCE now uses EGL, rather than GLX, to create an OpenGL context on Linux.
+
+**Possible Issues**
+
+EGL is a new dependency, and it may need to be added to your operating system.
+
+**Workaround**
+
+Install the libegl-dev package (Debian) or the equivalent for your operating
+system.
+
+**Rationale**
+
+Using EGL, rather than GLX, broadens the range of hardware we can deploy JUCE
+on.
+
+
 # Version 8.0.13
 
 ## Change

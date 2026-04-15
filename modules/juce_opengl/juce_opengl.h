@@ -38,7 +38,7 @@
   dependencies:       juce_gui_extra
   OSXFrameworks:      OpenGL
   iOSFrameworks:      OpenGLES
-  linuxPackages:      gl
+  linuxPackages:      egl gl
 
  END_JUCE_MODULE_DECLARATION
 
