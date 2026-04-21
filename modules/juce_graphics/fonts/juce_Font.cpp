@@ -78,7 +78,6 @@ public:
         const ScopedWriteLock sl (lock);
 
         setSize (faces.size());
-        defaultFace = nullptr;
     }
 
     Typeface::Ptr findTypefaceFor (const Font& font)
@@ -126,16 +125,7 @@ public:
 
         face = std::move (newFace);
 
-        if (defaultFace == nullptr && key == Key{})
-            defaultFace = face.typeface;
-
         return face.typeface;
-    }
-
-    Typeface::Ptr getDefaultFace() const noexcept
-    {
-        const ScopedReadLock slr (lock);
-        return defaultFace;
     }
 
 private:
@@ -166,7 +156,6 @@ private:
         Typeface::Ptr typeface;
     };
 
-    Typeface::Ptr defaultFace;
     ReadWriteLock lock;
     Array<CachedFace> faces;
     size_t counter = 0;
