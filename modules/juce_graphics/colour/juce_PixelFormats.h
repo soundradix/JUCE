@@ -168,15 +168,31 @@ public:
     template <class Pixel>
     forcedinline constexpr void blend (Pixel src, uint32 extraAlpha) noexcept
     {
-        auto rb = maskPixelComponents (extraAlpha * src.getEvenBytes());
-        auto ag = maskPixelComponents (extraAlpha * src.getOddBytes());
+        auto srcRB = src.getEvenBytes();
+        auto srcAG = src.getOddBytes();
 
-        const auto alpha = 0x100 - (ag >> 16);
+        if (extraAlpha != 256u)
+        {
+            srcRB = maskPixelComponents (extraAlpha * srcRB);
+            srcAG = maskPixelComponents (extraAlpha * srcAG);
+        }
 
-        rb += maskPixelComponents (getEvenBytes() * alpha);
-        ag += maskPixelComponents (getOddBytes() * alpha);
+        const auto srcAlpha = srcAG >> 16;
 
-        internal = clampPixelComponents (rb) | (clampPixelComponents (ag) << 8);
+        if (srcAlpha == 0)
+            return;
+
+        const uint32 invAlpha = 255u - srcAlpha;
+        const auto destRB = getEvenBytes() * invAlpha;
+        const auto destAG = getOddBytes()  * invAlpha;
+        const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
+        const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
+        const auto newDestRB = srcRB + ((destRB + corrRB + 0x00800080u) >> 8);
+        const auto newDestAG = srcAG + ((destAG + corrAG + 0x00800080u) >> 8);
+
+        const auto rb = getEvenBytes (newDestRB);
+        const auto ag = getEvenBytes (newDestAG);
+        internal = (ag << 8) | rb;
     }
 
     /** Blends another pixel with this one, creating a colour that is somewhere
