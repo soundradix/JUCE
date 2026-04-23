@@ -130,15 +130,24 @@ public:
     template <class Pixel>
     forcedinline constexpr void blend (Pixel src) noexcept
     {
-        auto rb = src.getEvenBytes();
-        auto ag = src.getOddBytes();
+        const auto srcAlpha = src.getAlpha();
 
-        const auto alpha = 0x100 - (ag >> 16);
+        if (srcAlpha == 0)
+            return;
 
-        rb += maskPixelComponents (getEvenBytes() * alpha);
-        ag += maskPixelComponents (getOddBytes() * alpha);
+        const uint32 invAlpha = 255u - srcAlpha;
+        const auto srcRB = src.getEvenBytes();
+        const auto srcAG = src.getOddBytes();
+        const auto destRB = getEvenBytes() * invAlpha;
+        const auto destAG = getOddBytes()  * invAlpha;
+        const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
+        const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
+        const auto newDestRB = srcRB + ((destRB + corrRB + 0x00800080u) >> 8);
+        const auto newDestAG = srcAG + ((destAG + corrAG + 0x00800080u) >> 8);
 
-        internal = clampPixelComponents (rb) | (clampPixelComponents (ag) << 8);
+        const auto rb = getEvenBytes (newDestRB);
+        const auto ag = getEvenBytes (newDestAG);
+        internal = (ag << 8) | rb;
     }
 
     /** Blends another pixel onto this one.

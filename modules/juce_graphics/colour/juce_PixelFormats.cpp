@@ -333,7 +333,7 @@ public:
                 return true;
             });
 
-            const auto expectedErrors = std::array<int64, 4> { 56457, 90792, 90792, 90792 };
+            const auto expectedErrors = std::array<int64, 4> { 0, 0, 0, 0 };
 
             expect (errors == expectedErrors,
                     "Rounding errors unexpectedly changed compared to JUCE 8.0.12. Expected: "
