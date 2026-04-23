@@ -152,6 +152,9 @@ public:
 
         The opacity of the pixel being overlaid is scaled by the extraAlpha factor before
         being used, so this can blend semi-transparently from a PixelRGB argument.
+
+        Scaling with extraAlpha is done using lossy, fixed-point arithmetic, where full opacity
+        is represented by 256.
     */
     template <class Pixel>
     forcedinline constexpr void blend (Pixel src, uint32 extraAlpha) noexcept
