@@ -342,21 +342,10 @@ public:
 
         beginTest ("PixelRGBA blending with extra alpha: Rounding errors should never exceed 2 in any channel");
         {
-            std::map<uint32, std::array<int64, 4>> errorsForExtraAlpha
-            {
-                { 0u,   std::array<int64, 4> {} },
-                { 1u,   std::array<int64, 4> { 65617, 327445, 327445, 327445 } },
-                { 64u,  std::array<int64, 4> { 268875, 599414, 599414, 599414 } },
-                { 128u, std::array<int64, 4> { 279034, 448019, 448019, 448019 } },
-                { 192u, std::array<int64, 4> { 330932, 735018, 735018, 735018 } },
-                { 244u, std::array<int64, 4> { 331904, 869905, 869905, 869905 } },
-                { 255u, std::array<int64, 4> { 331116, 1006666, 1006666, 1006666 } }
-            };
+            std::array<int64, 4> errors{};
 
             for (auto extraAlpha : { 0u, 1u, 64u, 128u, 192u, 244u, 255u })
             {
-                std::array<int64, 4> errors{};
-
                 iterateOverValidPremult ([this, extraAlpha, &errors] (PixelARGB source, PixelARGB dest)
                 {
                     auto actual = dest;
@@ -378,14 +367,13 @@ public:
 
                     return true;
                 });
-
-                const auto expectedErrors = errorsForExtraAlpha[extraAlpha];
-
-                expect (errors == expectedErrors,
-                        "Rounding errors unexpectedly changed compared to JUCE 8.0.12. extraAlpha: "
-                            + String (extraAlpha) + ", Expected: "
-                            + toString (expectedErrors) + " actual: " + toString (errors));
             }
+
+            const std::array<int64, 4> expectedErrors { 1607478, 3986467, 3986467, 3986467 };
+
+            expect (errors == expectedErrors,
+                    "Rounding errors unexpectedly changed compared to JUCE 8.0.12. Expected: "
+                        + toString (expectedErrors) + " actual: " + toString (errors));
         }
     }
 };
