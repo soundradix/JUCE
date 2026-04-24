@@ -2293,11 +2293,11 @@ void UIViewComponentPeer::grabFocus()
 
 void UIViewComponentPeer::textInputRequired (Point<int>, TextInputTarget&)
 {
-    // We need to restart the text input session so that the keyboard can change types if necessary.
+    // We need to reload the text input session so that the keyboard can change types if necessary.
     if ([hiddenTextInput.get() isFirstResponder])
-        [hiddenTextInput.get() resignFirstResponder];
-
-    [hiddenTextInput.get() becomeFirstResponder];
+        [hiddenTextInput.get() reloadInputViews];
+    else
+        [hiddenTextInput.get() becomeFirstResponder];
 }
 
 void UIViewComponentPeer::closeInputMethodContext()
