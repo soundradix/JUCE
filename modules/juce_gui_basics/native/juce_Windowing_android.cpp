@@ -2510,7 +2510,12 @@ private:
         env->CallVoidMethod (activityWindow, AndroidWindow.setStatusBarColor, fullyTransparent);
         env->CallVoidMethod (activityWindow, AndroidWindow.setNavigationBarColor, fullyTransparent);
 
-        env->CallVoidMethod (activityWindow, AndroidWindow.setFlags, FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS, FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        // This call makes interacting with a kiosk mode application impossible on Android 11.
+        // After this call, any interaction with the app will result in a callback to
+        // onApplyWindowInsets, which eventually calls this function again. As a consequence the
+        // navigation bar is opened, immediately dismissed, and user inputs never reach our app.
+        if (getAndroidSDKVersion() > 30 || Desktop::getInstance().getKioskModeComponent() == nullptr)
+            env->CallVoidMethod (activityWindow, AndroidWindow.setFlags, FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS, FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
 
         if (getAndroidSDKVersion() >= 29)
             env->CallVoidMethod (activityWindow, AndroidWindow29.setNavigationBarContrastEnforced, (jboolean) false);
