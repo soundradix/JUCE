@@ -77,7 +77,7 @@ public:
     /** Obsolete: Prefer to use getVSTClient(), getVST3Client(),
         getAudioUnitClient(), and/or getARAClient().
     */
-    virtual void getExtensions (class ExtensionsVisitor&) const = delete;
+    void getExtensions (class ExtensionsVisitor&) const = delete;
 
     /** Returns ARA-specific extensions, or nullptr if extensions are unavailable. */
     virtual       AudioPluginExtensions::ARAClient* getARAClient()       { return nullptr; }
