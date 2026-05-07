@@ -4289,27 +4289,34 @@ public:
 
     FileSearchPath getDefaultLocationsToSearch()
     {
-      #if JUCE_MAC
-        return { "~/Library/Audio/Plug-Ins/LV2;"
-                 "~/.lv2;"
-                 "/usr/local/lib/lv2;"
-                 "/usr/lib/lv2;"
-                 "/Library/Audio/Plug-Ins/LV2;" };
-      #elif JUCE_WINDOWS
-        return { "%APPDATA%\\LV2;"
-                 "%COMMONPROGRAMFILES%\\LV2" };
-      #else
-       #if JUCE_64BIT
-        if (File ("/usr/lib64/lv2").exists() || File ("/usr/local/lib64/lv2").exists())
-            return { "~/.lv2;"
-                     "/usr/lib64/lv2;"
-                     "/usr/local/lib64/lv2" };
-       #endif
+        auto defaults = std::invoke ([]() -> FileSearchPath
+        {
+          #if JUCE_MAC
+            return { "~/Library/Audio/Plug-Ins/LV2;"
+                     "~/.lv2;"
+                     "/Library/Audio/Plug-Ins/LV2;"
+                     "/usr/local/lib/lv2;"
+                     "/usr/lib/lv2;" };
+          #elif JUCE_WINDOWS
+            return { "%APPDATA%\\LV2;"
+                     "%COMMONPROGRAMFILES%\\LV2" };
+          #else
+           #if JUCE_64BIT
+            if (File ("/usr/lib64/lv2").exists() || File ("/usr/local/lib64/lv2").exists())
+                return { "~/.lv2;"
+                         "/usr/local/lib64/lv2;"
+                         "/usr/lib64/lv2" };
+           #endif
 
-        return { "~/.lv2;"
-                 "/usr/lib/lv2;"
-                 "/usr/local/lib/lv2" };
-      #endif
+            return { "~/.lv2;"
+                     "/usr/local/lib/lv2;"
+                     "/usr/lib/lv2" };
+          #endif
+        });
+
+        FileSearchPath result { SystemStats::getEnvironmentVariable ("LV2_PATH", "").replace (":", ";") };
+        result.addPath (defaults);
+        return result;
     }
 
     const LilvUI* findEmbeddableUi (const lv2_host::Uis* pluginUis, std::true_type)
