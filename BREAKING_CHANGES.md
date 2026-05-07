@@ -4,6 +4,30 @@
 
 ## Change
 
+72e1ba6a80bb163633622ee9694856cacc24e5b9 made AudioProcessor::createEditor()
+private. It also incorrectly renamed createEditorIfNeeded() to
+createEditorIfNecessary(). The old naming has now be reinstated.
+
+**Possible Issues**
+
+Code that calls createEditor() directly will fail to compile.
+
+**Workaround**
+
+To create an editor for an AudioProcessor, call
+AudioProcessor::createEditorAndMakeActive().
+
+**Rationale**
+
+In order for AudioProcessor::getActiveEditor() to return the correct result,
+the AudioProcessor must store a pointer to the newly-created editor after
+createEditor() returns. Allowing users to call createEditor() directly would
+prevent the internal editor pointer from being updated, breaking the behaviour
+of getActiveEditor().
+
+
+## Change
+
 The value returned by AlertWindow::show() has been changed so that it is
 consistent between native and non-native windows. The documentation has been
 updated to describe the new behaviour.

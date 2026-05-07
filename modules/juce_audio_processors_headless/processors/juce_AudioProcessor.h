@@ -1056,7 +1056,7 @@ public:
         Prefer createEditorAndMakeActive().
     */
     [[deprecated ("Prefer createEditorAndMakeActive()")]]
-    AudioProcessorEditor* createEditorIfNecessary() { return createEditorAndMakeActive(); }
+    AudioProcessorEditor* createEditorIfNeeded() { return createEditorAndMakeActive(); }
 
     //==============================================================================
     /** Returns the default number of steps for a parameter.
