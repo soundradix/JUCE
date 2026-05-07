@@ -100,11 +100,39 @@ public:
         return copy;
     }
 
-    void blend (PixelDouble src, uint32 extraAlpha = 255)
+    void blend (PixelDouble src, BlendMode mode, uint32 extraAlpha = 255)
     {
         src = src * (extraAlpha / 255.0);
 
-        *this = src + *this * (1.0 - src.a);
+        switch (mode)
+        {
+            // R = S + D * (1 - Sa)
+            case BlendMode::sourceOver:
+                *this = src + *this * (1.0 - src.a);
+                return;
+
+            // R = S
+            case BlendMode::source:
+                *this = src;
+                return;
+
+            //< R = D * Sa
+            case BlendMode::destinationIn:
+                *this = *this * src.a;
+                return;
+
+            // R = D * (1 - Sa)
+            case BlendMode::destinationOut:
+                *this = *this * (1.0 - src.a);
+                return;
+        }
+
+        jassertfalse;
+    }
+
+    void blend (PixelDouble src, uint32 extraAlpha = 255)
+    {
+        blend (src, BlendMode::sourceOver, extraAlpha);
     }
 
     PixelARGB toPixelARGB() const
@@ -183,6 +211,20 @@ static String toString (std::array<int64, 4> err)
     String s;
     s << "(" << err[0] << ", " << err[1] << ", " << err[2] << ", " << err[3] << ")";
     return s;
+}
+
+static String toString (BlendMode mode)
+{
+    switch (mode)
+    {
+        case BlendMode::sourceOver:     return "sourceOver";
+        case BlendMode::source:         return "source";
+        case BlendMode::destinationIn:  return "destinationIn";
+        case BlendMode::destinationOut: return "destinationOut";
+    }
+
+    jassertfalse;
+    return {};
 }
 
 static PixelARGB makePixelARGB (int a, int r, int g, int b)
@@ -342,24 +384,67 @@ public:
 
         beginTest ("PixelRGBA blending with extra alpha: Rounding errors should never exceed 2 in any channel");
         {
-            std::array<int64, 4> errors{};
-
-            for (auto extraAlpha : { 0u, 1u, 64u, 128u, 192u, 244u, 255u })
+            for (auto mode : { BlendMode::sourceOver, BlendMode::source, BlendMode::destinationIn, BlendMode::destinationOut })
             {
-                iterateOverValidPremult ([this, extraAlpha, &errors] (PixelARGB source, PixelARGB dest)
+                std::array<int64, 4> errors{};
+
+                for (auto extraAlpha : { 0u, 1u, 64u, 128u, 192u, 244u, 255u })
+                {
+                    iterateOverValidPremult ([this, extraAlpha, &errors, mode] (PixelARGB source, PixelARGB dest)
+                    {
+                        auto actual = dest;
+                        actual.blend (source, mode, extraAlpha);
+
+                        PixelDouble sourcePixel (source);
+                        PixelDouble expected (dest);
+                        expected.blend (sourcePixel, mode, extraAlpha);
+
+                        if (! expected.verifyChannelError (actual, errors, 2))
+                        {
+                            expect (false,
+                                    "Rounding error in excess of 2 encountered in " + toString (mode)
+                                        + " mode. extraAlpha: "
+                                        + String (extraAlpha) + ", "
+                                        + createErrorMessage (dest, source, expected, actual));
+
+                            return false;
+                        }
+
+                        return true;
+                    });
+                }
+
+                if (mode == BlendMode::sourceOver)
+                {
+                    const std::array<int64, 4> expectedErrors { 1607478, 3986467, 3986467, 3986467 };
+
+                    expect (errors == expectedErrors,
+                            "Rounding errors unexpectedly changed compared to JUCE 8.0.12. Expected: "
+                                + toString (expectedErrors) + " actual: " + toString (errors));
+                }
+            }
+        }
+
+        beginTest ("PixelRGBA blending, all modes: Rounding errors should never exceed 1 in any channel");
+        {
+            for (auto mode : { BlendMode::sourceOver, BlendMode::source, BlendMode::destinationIn, BlendMode::destinationOut })
+            {
+                std::array<int64, 4> errors{};
+
+                iterateOverValidPremult ([this, mode, &errors] (PixelARGB source, PixelARGB dest)
                 {
                     auto actual = dest;
-                    actual.blend (source, extraAlpha);
+                    actual.blend (source, mode);
 
                     PixelDouble sourcePixel (source);
                     PixelDouble expected (dest);
-                    expected.blend (sourcePixel, extraAlpha);
+                    expected.blend (sourcePixel, mode);
 
-                    if (! expected.verifyChannelError (actual, errors, 2))
+                    if (! expected.verifyChannelError (actual, errors))
                     {
                         expect (false,
-                                "Rounding error in excess of 2 encountered. extraAlpha: "
-                                    + String (extraAlpha) + ", "
+                                "Rounding error in excess of 1 encountered in " + toString (mode)
+                                    + " mode. "
                                     + createErrorMessage (dest, source, expected, actual));
 
                         return false;
@@ -367,13 +452,66 @@ public:
 
                     return true;
                 });
+
+                if (mode == BlendMode::sourceOver)
+                {
+                    const auto expectedErrors = std::array<int64, 4> { 0, 0, 0, 0 };
+
+                    expect (errors == expectedErrors,
+                            "Rounding errors unexpectedly changed compared to JUCE 8.0.12. Expected: "
+                                + toString (expectedErrors) + " actual: " + toString (errors));
+                }
+                else if (mode == BlendMode::source)
+                {
+                    const auto expectedErrors = std::array<int64, 4>{};
+
+                    expect (errors == expectedErrors,
+                            "There should be 0 rounding error in source mode");
+                }
+                else if (mode == BlendMode::destinationIn)
+                {
+                    const auto expectedErrors = std::array<int64, 4> { 0, 0, 0, 0 };
+
+                    expect (errors == expectedErrors,
+                            "Rounding errors in destinationIn mode unexpectedly changed compared to earlier version. Expected: "
+                                + toString (expectedErrors) + " actual: " + toString (errors));
+                }
+                else if (mode == BlendMode::destinationOut)
+                {
+                    const auto expectedErrors = std::array<int64, 4> { 0, 0, 0, 0 };
+
+                    expect (errors == expectedErrors,
+                            "Rounding errors in destinationOut mode unexpectedly changed compared to earlier version. Expected: "
+                                + toString (expectedErrors) + " actual: " + toString (errors));
+                }
             }
+        }
 
-            const std::array<int64, 4> expectedErrors { 1607478, 3986467, 3986467, 3986467 };
+        beginTest ("Blending: opaque destination");
+        {
+            auto dest = makePixelARGB (255, 0, 91, 0);
+            dest.blend (makePixelARGB (50, 0, 0, 0), BlendMode::sourceOver);
 
-            expect (errors == expectedErrors,
-                    "Rounding errors unexpectedly changed compared to JUCE 8.0.12. Expected: "
-                        + toString (expectedErrors) + " actual: " + toString (errors));
+            expect (equals (dest, makePixelARGB (255, 0, 73, 0)),
+                    "Blending into a fully opaque pixel in sourceOver mode should result in a fully opaque pixel.");
+        }
+
+        beginTest ("Blending: opaque black over white");
+        {
+            auto dest = makePixelARGB (255, 255, 255, 255);
+            dest.blend (makePixelARGB (255, 0, 0, 0), BlendMode::sourceOver);
+
+            expect (equals (dest, makePixelARGB (255, 0, 0, 0)),
+                    "Blending opaque black over opaque white should be opaque black");
+        }
+
+        beginTest ("Blending: transparent black over white");
+        {
+            auto dest = makePixelARGB (255, 255, 255, 255);
+            dest.blend (makePixelARGB (0, 0, 0, 0), BlendMode::sourceOver);
+
+            expect (equals (dest, makePixelARGB (255, 255, 255, 255)),
+                    "Blending transparent black over white should be white");
         }
     }
 };

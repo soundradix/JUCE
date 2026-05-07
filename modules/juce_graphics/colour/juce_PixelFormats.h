@@ -38,6 +38,22 @@ forcedinline constexpr uint32 clampPixelComponents (uint32 x) noexcept
 }
 
 //==============================================================================
+/** Identifiers for specifying the blending mode.
+
+    In the descriptions below R denotes the resulting colour, S is the source colour,
+    D is the destination colour, Sa and Da are the alpha components of S and D.
+
+    @see Graphics::setImageBlendMode
+*/
+enum class BlendMode
+{
+    sourceOver,     ///< R = S + D * (1 - Sa)
+    source,         ///< R = S
+    destinationIn,  ///< R = D * Sa
+    destinationOut  ///< R = D * (1 - Sa)
+};
+
+//==============================================================================
 /**
     Represents a 32-bit INTERNAL pixel with premultiplied alpha, and can perform compositing
     operations with it.
@@ -122,6 +138,17 @@ public:
     }
 
     //==============================================================================
+    /** Blends another pixel onto this one using the specified blend mode.
+
+        This takes into account the opacity of the pixel being overlaid, and blends
+        it accordingly.
+    */
+    template <class Pixel>
+    forcedinline constexpr void blend (Pixel src, BlendMode mode) noexcept
+    {
+        blend (src, mode, 256);
+    }
+
     /** Blends another pixel onto this one.
 
         This takes into account the opacity of the pixel being overlaid, and blends
@@ -130,24 +157,7 @@ public:
     template <class Pixel>
     forcedinline constexpr void blend (Pixel src) noexcept
     {
-        const auto srcAlpha = src.getAlpha();
-
-        if (srcAlpha == 0)
-            return;
-
-        const uint32 invAlpha = 255u - srcAlpha;
-        const auto srcRB = src.getEvenBytes();
-        const auto srcAG = src.getOddBytes();
-        const auto destRB = getEvenBytes() * invAlpha;
-        const auto destAG = getOddBytes()  * invAlpha;
-        const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
-        const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
-        const auto newDestRB = srcRB + ((destRB + corrRB + 0x00800080u) >> 8);
-        const auto newDestAG = srcAG + ((destAG + corrAG + 0x00800080u) >> 8);
-
-        const auto rb = getEvenBytes (newDestRB);
-        const auto ag = getEvenBytes (newDestAG);
-        internal = (ag << 8) | rb;
+        blend (src, BlendMode::sourceOver);
     }
 
     /** Blends another pixel onto this one.
@@ -166,7 +176,7 @@ public:
         is represented by 256.
     */
     template <class Pixel>
-    forcedinline constexpr void blend (Pixel src, uint32 extraAlpha) noexcept
+    forcedinline constexpr void blend (Pixel src, BlendMode mode, uint32 extraAlpha) noexcept
     {
         auto srcRB = src.getEvenBytes();
         auto srcAG = src.getOddBytes();
@@ -179,20 +189,76 @@ public:
 
         const auto srcAlpha = srcAG >> 16;
 
-        if (srcAlpha == 0)
-            return;
+        switch (mode)
+        {
+            case BlendMode::sourceOver:
+            {
+                if (srcAlpha == 0)
+                    return;
 
-        const uint32 invAlpha = 255u - srcAlpha;
-        const auto destRB = getEvenBytes() * invAlpha;
-        const auto destAG = getOddBytes()  * invAlpha;
-        const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
-        const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
-        const auto newDestRB = srcRB + ((destRB + corrRB + 0x00800080u) >> 8);
-        const auto newDestAG = srcAG + ((destAG + corrAG + 0x00800080u) >> 8);
+                const uint32 invAlpha = 255u - srcAlpha;
+                const auto destRB = getEvenBytes() * invAlpha;
+                const auto destAG = getOddBytes()  * invAlpha;
+                const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
+                const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
+                const auto newDestRB = srcRB + ((destRB + corrRB + 0x00800080u) >> 8);
+                const auto newDestAG = srcAG + ((destAG + corrAG + 0x00800080u) >> 8);
 
-        const auto rb = getEvenBytes (newDestRB);
-        const auto ag = getEvenBytes (newDestAG);
-        internal = (ag << 8) | rb;
+                const auto rb = getEvenBytes (newDestRB);
+                const auto ag = getEvenBytes (newDestAG);
+                internal = (ag << 8) | rb;
+                return;
+            }
+
+            case BlendMode::source:
+            {
+                internal = (srcAG << 8) | srcRB;
+                return;
+            }
+
+            case BlendMode::destinationIn:
+            {
+                if (srcAlpha == 0)
+                {
+                    internal = 0;
+                    return;
+                }
+
+                const auto destRB = getEvenBytes() * srcAlpha;
+                const auto destAG = getOddBytes()  * srcAlpha;
+                const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
+                const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
+                const auto newDestRB = (destRB + corrRB + 0x00800080u) >> 8;
+                const auto newDestAG = (destAG + corrAG + 0x00800080u) >> 8;
+
+                const auto rb = getEvenBytes (newDestRB);
+                const auto ag = getEvenBytes (newDestAG);
+                internal = (ag << 8) | rb;
+                return;
+            }
+
+            case BlendMode::destinationOut:
+            {
+                const uint32 invAlpha = 255u - srcAlpha;
+                const auto destRB = getEvenBytes() * invAlpha;
+                const auto destAG = getOddBytes()  * invAlpha;
+                const auto corrRB = (destRB >> 8) & 0x00ff00ffu;
+                const auto corrAG = (destAG >> 8) & 0x00ff00ffu;
+                const auto newDestRB = (destRB + corrRB + 0x00800080u) >> 8;
+                const auto newDestAG = (destAG + corrAG + 0x00800080u) >> 8;
+
+                const auto rb = getEvenBytes (newDestRB);
+                const auto ag = getEvenBytes (newDestAG);
+                internal = (ag << 8) | rb;
+                return;
+            }
+        }
+    }
+
+    template <class Pixel>
+    forcedinline constexpr void blend (Pixel src, uint32 extraAlpha) noexcept
+    {
+        blend (src, BlendMode::sourceOver, extraAlpha);
     }
 
     /** Blends another pixel with this one, creating a colour that is somewhere
@@ -525,6 +591,74 @@ public:
        #endif
     }
 
+    /** Blends another pixel onto this one with the specified blend mode and applying an
+        extra multiplier to its opacity.
+
+        The opacity of the pixel being overlaid is scaled by the extraAlpha factor before
+        being used, so this can blend semi-transparently from a PixelRGB argument.
+
+        Scaling with extraAlpha is done using lossy, fixed-point arithmetic, where full opacity
+        is represented by 256.
+    */
+    template <class Pixel>
+    forcedinline void blend (const Pixel& src, BlendMode mode, uint32 extraAlpha = 256u) noexcept
+    {
+        auto Srb = src.getEvenBytes();
+        auto Sag = src.getOddBytes();
+
+        if (extraAlpha != 256u)
+        {
+            Srb = maskPixelComponents (extraAlpha * Srb);
+            Sag = maskPixelComponents (extraAlpha * Sag);
+        }
+
+        uint32 rb{}, ag{};
+
+        switch (mode)
+        {
+            case BlendMode::sourceOver:
+            {
+                const auto oneMinusSa = 0x100 - (Sag >> 16);
+                rb = clampPixelComponents (Srb + maskPixelComponents (getEvenBytes() * oneMinusSa));
+                ag = clampPixelComponents (Sag + maskPixelComponents (getOddBytes() * oneMinusSa));
+                break;
+            }
+
+            case BlendMode::source:
+            {
+                rb = Srb;
+                ag = Sag;
+                break;
+            }
+
+            case BlendMode::destinationIn:
+            {
+                const auto Sa = (Sag >> 16) + 1;
+                rb = maskPixelComponents (getEvenBytes() * Sa);
+                ag = maskPixelComponents (getOddBytes() * Sa);
+                break;
+            }
+
+            case BlendMode::destinationOut:
+            {
+                const auto oneMinusSa = 0x100 - (Sag >> 16);
+                rb = maskPixelComponents (getEvenBytes() * oneMinusSa);
+                ag = maskPixelComponents (getOddBytes() * oneMinusSa);
+                break;
+            }
+        }
+
+        g = (uint8) (ag & 0xff);
+
+       #if JUCE_ANDROID
+        b = (uint8) (rb >> 16);
+        r = (uint8) (rb & 0xff);
+       #else
+        r = (uint8) (rb >> 16);
+        b = (uint8) (rb & 0xff);
+       #endif
+    }
+
     /** Blends another pixel with this one, creating a colour that is somewhere
         between the two, as specified by the amount.
     */
@@ -694,6 +828,59 @@ public:
         ++extraAlpha;
         const auto srcAlpha = (int) ((extraAlpha * src.getAlpha()) >> 8);
         a = (uint8) ((a * (0x100 - srcAlpha) >> 8) + srcAlpha);
+    }
+
+    /** Blends another pixel onto this one using the specified blend mode and applying an
+        extra multiplier to its opacity.
+
+        The opacity of the pixel being overlaid is scaled by the extraAlpha factor before
+        being used, so this can blend semi-transparently from a PixelRGB argument.
+
+        Unlike the similar function of the PixelARGB and PixelRGB classes, full opacity
+        is represented by extraAlpha = 255.
+    */
+    template <class Pixel>
+    forcedinline void blend (const Pixel& src, BlendMode mode, uint32 extraAlpha = 255u) noexcept
+    {
+        auto Sa = (uint32) src.getAlpha();
+
+        if (extraAlpha != 255u)
+        {
+            ++extraAlpha;
+            Sa = (extraAlpha * Sa) >> 8;
+        }
+
+        auto& Da = a;
+
+        switch (mode)
+        {
+            case BlendMode::sourceOver:
+            {
+                const auto oneMinusSa = 0x100 - Sa;
+                Da = (uint8) (Sa + ((Da * oneMinusSa) >> 8));
+                return;
+            }
+
+            case BlendMode::source:
+            {
+                Da = (uint8) Sa;
+                return;
+            }
+
+            case BlendMode::destinationIn:
+            {
+                Da = (uint8) ((Da * (Sa + 1)) >> 8);
+                return;
+            }
+
+            case BlendMode::destinationOut:
+            {
+                const auto oneMinusSa = 0x100 - Sa;
+                Da = (uint8) ((Da * oneMinusSa) >> 8);
+                return;
+            }
+        }
+        jassertfalse;
     }
 
     /** Blends another pixel with this one, creating a colour that is somewhere
