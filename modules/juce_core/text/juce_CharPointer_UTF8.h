@@ -542,8 +542,12 @@ public:
                 if (++codeUnitIndex >= maxCodeUnitsToRead)
                     return false;
 
-                bytes <<= 8;
-                bytes |= (uint32_t) (uint8_t) codeUnits[codeUnitIndex];
+                const auto trailing = codeUnits[codeUnitIndex];
+
+                if ((trailing & 0xc0) != 0x80)
+                    return false;
+
+                bytes = (bytes << 8) | (uint32_t) (uint8_t) trailing;
             }
 
             if (constexpr uint32_t firstTwoByteCodePoint = 0xc280; bytes < firstTwoByteCodePoint)
