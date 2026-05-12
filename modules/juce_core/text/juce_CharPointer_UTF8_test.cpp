@@ -122,6 +122,35 @@ public:
             expect (! isValid (0xf0, 0x90, 0x00, 0x00));
             expect (! isValid (0xf0, 0xff, 0xff, 0xff));
         });
+
+        testCase ("Dereferencing a malformed string produces replacement character", [&]
+        {
+            const auto doDeref = [&] (auto... x)
+            {
+                const char items[] { static_cast<char> (x)... };
+                return CharPointer_UTF8 { items }.getAndAdvance();
+            };
+
+            static constexpr juce_wchar replacement = 0xfffd;
+
+            expectEquals (doDeref (0x80), replacement);
+            expectEquals (doDeref (0xbf), replacement);
+
+            expectEquals (doDeref (0xe0, 0xa0, 0x00), replacement);
+            expectEquals (doDeref (0xe0, 0x00, 0x80), replacement);
+
+            expectEquals (doDeref (0xf0, 0x90, 0x80, 0x00), replacement);
+            expectEquals (doDeref (0xf0, 0x90, 0x00, 0x80), replacement);
+            expectEquals (doDeref (0xf0, 0x00, 0x80, 0x80), replacement);
+
+            // overlong sequences
+            expectEquals (doDeref (0xc0, 0x80), replacement);
+            expectEquals (doDeref (0xe0, 0x80, 0x80), replacement);
+            expectEquals (doDeref (0xf0, 0x80, 0x80, 0x80), replacement);
+
+            // beyond upper range
+            expectEquals (doDeref (0xf4, 0x90, 0x80, 0x80), replacement);
+        });
     }
 };
 
