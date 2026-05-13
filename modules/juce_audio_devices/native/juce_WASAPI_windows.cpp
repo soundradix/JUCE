@@ -1280,6 +1280,9 @@ public:
             bufferSizes.clear();
             bufferSizes.addUsingDefaultSort (defaultBufferSize);
 
+            if (deviceMode == WASAPIDeviceMode::shared)
+                return true;
+
             if (minBufferSize != defaultBufferSize)
                 bufferSizes.addUsingDefaultSort (minBufferSize);
 
