@@ -910,7 +910,7 @@ private:
             if (iconsFromZipFile.size() == 0)
             {
                 // If we've not already done so, load all the images from the zip file..
-                ZipFile icons (createAssetInputStream ("icons.zip").release(), true);
+                ZipFile icons { createAssetInputStream ("icons.zip") };
 
                 for (int i = 0; i < icons.getNumEntries(); ++i)
                 {
