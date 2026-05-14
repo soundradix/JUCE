@@ -72,7 +72,7 @@ struct ZipFile::ZipEntryHolder
         auto day       = (int) (date & 31);
         auto hours     = (int) time >> 11;
         auto minutes   = (int) ((time >> 5) & 63);
-        auto seconds   = (int) ((time & 31) << 1);
+        auto seconds   = (int) ((time & 31) * 2);
 
         return { year, month, day, hours, minutes, seconds };
     }
@@ -600,7 +600,7 @@ private:
 
     static void writeTimeAndDate (OutputStream& target, Time t)
     {
-        target.writeShort ((short) (t.getSeconds() + (t.getMinutes() << 5) + (t.getHours() << 11)));
+        target.writeShort ((short) ((t.getSeconds() / 2) + (t.getMinutes() << 5) + (t.getHours() << 11)));
         target.writeShort ((short) (t.getDayOfMonth() + ((t.getMonth() + 1) << 5) + ((t.getYear() - 1980) << 9)));
     }
 
