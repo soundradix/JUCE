@@ -617,10 +617,22 @@ public:
             return cachedValue;
         }
 
+        void syncCachedValue()
+        {
+            const ScopedLock sl (pluginInstance.lock);
+
+            AudioUnitParameterValue newValue{};
+
+            if (AudioUnitGetParameter (pluginInstance.audioUnit, paramID, kAudioUnitScope_Global, 0, &newValue) != noErr)
+                return;
+
+            cachedValue = normaliseParamValue (newValue);
+        }
+
         void updateCachedValueAndNotify (float newValue)
         {
             cachedValue = newValue;
-            sendValueChangedMessageToListeners (cachedValue);
+            sendValueChangedMessageToListeners (newValue);
         }
 
         void setValue (float newValue) override
@@ -1487,6 +1499,14 @@ public:
     void sendAllParametersChangedEvents()
     {
         jassert (audioUnit != nullptr);
+
+        for (const auto& idAndParam : paramIDToParameter)
+        {
+            if (auto* param = idAndParam.second)
+            {
+                param->syncCachedValue();
+            }
+        }
 
         AudioUnitParameter param;
         param.mAudioUnit = audioUnit;
