@@ -1083,7 +1083,7 @@ function(_juce_add_vst3_manifest_helper_target shared_code_target out_target out
     endif()
 
     get_target_property(juce_library_code "${shared_code_target}" JUCE_GENERATED_SOURCES_DIRECTORY)
-    set(build_dir "${juce_library_code}/vst3_helper")
+    set(build_dir "${CMAKE_BINARY_DIR}}/vst3_helpers/${shared_code_target}")
     set(helper_name "vst3_helper")
 
     set(shared_defs_file "${build_dir}/shared_defs_$<CONFIG>.txt")
@@ -1093,10 +1093,6 @@ function(_juce_add_vst3_manifest_helper_target shared_code_target out_target out
     file(GENERATE OUTPUT "${shared_incs_file}" CONTENT "$<TARGET_PROPERTY:${shared_code_target},INCLUDE_DIRECTORIES>")
 
     set(PASSTHROUGH_ARGS "")
-
-    if(CMAKE_C_COMPILER)
-        list(APPEND PASSTHROUGH_ARGS "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}")
-    endif()
 
     if(CMAKE_CXX_COMPILER)
         list(APPEND PASSTHROUGH_ARGS "-DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}")
