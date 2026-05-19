@@ -1,6 +1,6 @@
 # JUCE breaking changes
 
-# develop
+# Version 8.0.13
 
 ## Change
 
@@ -155,7 +155,7 @@ The following member functions of Font have been removed:
 - Font::getStringWidth()
 - Font::getStringWidthFloat()
 
-The signatures of the following functions have changed, removing the 
+The signatures of the following functions have changed, removing the
 TypefaceMetricsKind argument:
 - Typeface::getOutlineForGlyph()
 - Typeface::getGlyphBounds()
@@ -451,10 +451,10 @@ containers, and returning a FocusTraverser object created using the
 
 **Rationale**
 
-Disabled components are typically rendered in a dimmed or inactive state, but 
+Disabled components are typically rendered in a dimmed or inactive state, but
 are still prominently visible for sighted users. The old behaviour made these
-components entirely missing from the accessibility tree, making them 
-non-discoverable with screen readers. 
+components entirely missing from the accessibility tree, making them
+non-discoverable with screen readers.
 
 This was in contrast to the behaviour of native OS components, that are still
 accessible using screen readers, but their disabled/dimmed state is also
