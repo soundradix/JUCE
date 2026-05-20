@@ -169,7 +169,7 @@ namespace PathStrokeHelpers
 
     static void addEdgeAndJoint (Path& destPath,
                                  const PathStrokeType::JointStyle style,
-                                 const float maxMiterExtensionSquared, const float width,
+                                 const float miterLimit, const float width,
                                  const float x1, const float y1,
                                  const float x2, const float y2,
                                  const float x3, const float y3,
@@ -196,8 +196,11 @@ namespace PathStrokeHelpers
             {
                 if (style == PathStrokeType::mitered)
                 {
+                    Point<float> mid { midX, midY };
+                    const auto halfMiterLength = intersection.point.getDistanceFrom (mid);
+
                     if (0.0f < intersection.distanceBeyondLine1EndSquared
-                        && intersection.distanceBeyondLine1EndSquared < maxMiterExtensionSquared)
+                        && halfMiterLength <= width * miterLimit)
                     {
                         destPath.lineTo (intersection.point);
                     }
@@ -406,7 +409,7 @@ namespace PathStrokeHelpers
     }
 
     static void addSubPath (Path& destPath, Array<LineSection>& subPath,
-                            const bool isClosed, const float width, const float maxMiterExtensionSquared,
+                            const bool isClosed, const float width, const float miterLimit,
                             const PathStrokeType::JointStyle jointStyle, const PathStrokeType::EndCapStyle endStyle,
                             const Arrowhead* const arrowhead)
     {
@@ -442,7 +445,7 @@ namespace PathStrokeHelpers
             const LineSection& l = subPath.getReference (i);
 
             addEdgeAndJoint (destPath, jointStyle,
-                             maxMiterExtensionSquared, width,
+                             miterLimit, width,
                              lastX1, lastY1, lastX2, lastY2,
                              l.lx1, l.ly1, l.lx2, l.ly2,
                              l.x1, l.y1);
@@ -460,7 +463,7 @@ namespace PathStrokeHelpers
             auto& l = subPath.getReference (0);
 
             addEdgeAndJoint (destPath, jointStyle,
-                             maxMiterExtensionSquared, width,
+                             miterLimit, width,
                              lastX1, lastY1, lastX2, lastY2,
                              l.lx1, l.ly1, l.lx2, l.ly2,
                              l.x1, l.y1);
@@ -489,7 +492,7 @@ namespace PathStrokeHelpers
             auto& l = subPath.getReference (i);
 
             addEdgeAndJoint (destPath, jointStyle,
-                             maxMiterExtensionSquared, width,
+                             miterLimit, width,
                              lastX1, lastY1, lastX2, lastY2,
                              l.rx1, l.ry1, l.rx2, l.ry2,
                              l.x2, l.y2);
@@ -503,7 +506,7 @@ namespace PathStrokeHelpers
         if (isClosed)
         {
             addEdgeAndJoint (destPath, jointStyle,
-                             maxMiterExtensionSquared, width,
+                             miterLimit, width,
                              lastX1, lastY1, lastX2, lastY2,
                              lastLine.rx1, lastLine.ry1, lastLine.rx2, lastLine.ry2,
                              lastLine.x2, lastLine.y2);
@@ -518,12 +521,15 @@ namespace PathStrokeHelpers
     }
 
     static void createStroke (const float thickness, const PathStrokeType::JointStyle jointStyle,
+                              float miterLimit,
                               const PathStrokeType::EndCapStyle endStyle,
                               Path& destPath, const Path& source,
                               const AffineTransform& transform,
                               const float extraAccuracy, const Arrowhead* const arrowhead)
     {
         jassert (extraAccuracy > 0);
+
+        miterLimit = std::max (1.0f, miterLimit);
 
         if (thickness <= 0)
         {
@@ -546,7 +552,6 @@ namespace PathStrokeHelpers
 
         destPath.setUsingNonZeroWinding (true);
 
-        const float maxMiterExtensionSquared = 9.0f * thickness * thickness;
         const float width = 0.5f * thickness;
 
         // Iterate the path, creating a list of the
@@ -567,7 +572,7 @@ namespace PathStrokeHelpers
             {
                 if (subPath.size() > 0)
                 {
-                    addSubPath (destPath, subPath, false, width, maxMiterExtensionSquared, jointStyle, endStyle, arrowhead);
+                    addSubPath (destPath, subPath, false, width, miterLimit, jointStyle, endStyle, arrowhead);
                     subPath.clearQuick();
                 }
 
@@ -613,7 +618,7 @@ namespace PathStrokeHelpers
 
                 if (it.closesSubPath)
                 {
-                    addSubPath (destPath, subPath, true, width, maxMiterExtensionSquared, jointStyle, endStyle, arrowhead);
+                    addSubPath (destPath, subPath, true, width, miterLimit, jointStyle, endStyle, arrowhead);
                     subPath.clearQuick();
                 }
                 else
@@ -625,14 +630,14 @@ namespace PathStrokeHelpers
         }
 
         if (subPath.size() > 0)
-            addSubPath (destPath, subPath, false, width, maxMiterExtensionSquared, jointStyle, endStyle, arrowhead);
+            addSubPath (destPath, subPath, false, width, miterLimit, jointStyle, endStyle, arrowhead);
     }
 }
 
 void PathStrokeType::createStrokedPath (Path& destPath, const Path& sourcePath,
                                         const AffineTransform& transform, float extraAccuracy) const
 {
-    PathStrokeHelpers::createStroke (thickness, jointStyle, endStyle, destPath, sourcePath,
+    PathStrokeHelpers::createStroke (thickness, jointStyle, miterLimit, endStyle, destPath, sourcePath,
                                      transform, extraAccuracy, nullptr);
 }
 
@@ -763,7 +768,7 @@ void PathStrokeType::createStrokeWithArrowheads (Path& destPath,
     head.endWidth = arrowheadEndWidth;
     head.endLength = arrowheadEndLength;
 
-    PathStrokeHelpers::createStroke (thickness, jointStyle, endStyle,
+    PathStrokeHelpers::createStroke (thickness, jointStyle, miterLimit, endStyle,
                                      destPath, sourcePath, transform, extraAccuracy, &head);
 }
 

@@ -176,6 +176,12 @@ public:
     /** Sets the end-cap style. */
     void setEndStyle (EndCapStyle newStyle) noexcept            { endStyle = newStyle; }
 
+    /** Sets the miter limit for mitered joints. */
+    void setMiterLimit (float newMiterLimit) noexcept           { miterLimit = newMiterLimit; }
+
+    /** Returns the miter limit for mitered joints. */
+    float getMiterLimit() const noexcept                        { return miterLimit; }
+
     //==============================================================================
     /** Compares the stroke thickness, joint and end styles of two stroke types. */
     bool operator== (const PathStrokeType&) const noexcept;
@@ -188,6 +194,7 @@ private:
     float thickness;
     JointStyle jointStyle;
     EndCapStyle endStyle;
+    float miterLimit = 4.0f;
 
     JUCE_LEAK_DETECTOR (PathStrokeType)
 };
