@@ -2402,7 +2402,7 @@ public:
             auto clipped = clip->getClipBounds().getIntersection (r);
 
             if (! clipped.isEmpty())
-                fillShape (*new RectangleListRegionType (clipped), false);
+                fillShape (*new RectangleListRegionType (clipped));
         }
     }
 
@@ -2417,7 +2417,7 @@ public:
             auto clipped = clip->getClipBounds().toFloat().getIntersection (r);
 
             if (! clipped.isEmpty())
-                fillShape (*new EdgeTableRegionType (clipped), false);
+                fillShape (*new EdgeTableRegionType (clipped));
         }
     }
 
@@ -2480,7 +2480,7 @@ public:
 
             if (transform.isIdentity())
             {
-                fillShape (*new EdgeTableRegionType (list), false);
+                fillShape (*new EdgeTableRegionType (list));
             }
             else if (! transform.isRotated)
             {
@@ -2491,7 +2491,7 @@ public:
                 else
                     transformed.transformAll (transform.getTransform());
 
-                fillShape (*new EdgeTableRegionType (transformed), false);
+                fillShape (*new EdgeTableRegionType (transformed));
             }
             else
             {
@@ -2508,7 +2508,7 @@ public:
             auto clipRect = clip->getClipBounds();
 
             if (path.getBoundsTransformed (trans).getSmallestIntegerContainer().intersects (clipRect))
-                fillShape (*new EdgeTableRegionType (clipRect, path, trans), false);
+                fillShape (*new EdgeTableRegionType (clipRect, path, trans));
         }
     }
 
@@ -2519,7 +2519,7 @@ public:
             auto* edgeTableClip = new EdgeTableRegionType (edgeTable);
             edgeTableClip->edgeTable.translate (x, y);
 
-            fillShape (*edgeTableClip, false);
+            fillShape (*edgeTableClip);
         }
     }
 
@@ -2621,7 +2621,7 @@ public:
         fillAllWithGradient (shapeToFill);
     }
 
-    void fillShape (typename BaseRegionType::Ptr shapeToFill, bool replaceContents)
+    void fillShape (typename BaseRegionType::Ptr shapeToFill)
     {
         jassert (clip != nullptr);
         shapeToFill = clip->applyClipTo (shapeToFill);
@@ -2630,7 +2630,6 @@ public:
         {
             if (fillType.isGradient())
             {
-                jassert (! replaceContents); // that option is just for solid colours
                 dispatchFillAllWithGradient (shapeToFill);
             }
             else if (fillType.isTiledImage())
@@ -2639,7 +2638,7 @@ public:
             }
             else
             {
-                shapeToFill->fillAllWithColour (getThis(), fillType.colour.getPixelARGB(), replaceContents);
+                shapeToFill->fillAllWithColour (getThis(), fillType.colour.getPixelARGB(), false);
             }
         }
     }
