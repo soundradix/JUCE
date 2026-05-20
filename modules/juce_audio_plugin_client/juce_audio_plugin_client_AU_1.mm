@@ -572,8 +572,13 @@ public:
                     if (binding->inOutMagicNumber != ARA::kARAAudioUnitMagic)
                         return kAudioUnitErr_InvalidProperty;   // if the magic value isn't found, the property ID is re-used outside the ARA context with different, unsupported sematics
 
-                    AudioProcessorARAExtension* araAudioProcessorExtension = dynamic_cast<AudioProcessorARAExtension*> (juceFilter.get());
+                    auto* araAudioProcessorExtension = juceFilter->getARAClientExtensions();
+
+                    if (araAudioProcessorExtension == nullptr)
+                        return kAudioUnitErr_CannotDoInCurrentContext;
+
                     binding->outPlugInExtension = araAudioProcessorExtension->bindToARA (binding->inDocumentControllerRef, binding->knownRoles, binding->assignedRoles);
+
                     if (binding->outPlugInExtension == nullptr)
                         return kAudioUnitErr_CannotDoInCurrentContext;  // bindToARA() returns null if binding is already established
 
@@ -1210,7 +1215,14 @@ public:
         const double rate = getSampleRate();
         jassert (rate > 0);
        #if JucePlugin_Enable_ARA
-        jassert (juceFilter->getLatencySamples() == 0 || ! dynamic_cast<AudioProcessorARAExtension*> (juceFilter.get())->isBoundToARA());
+        jassert (juceFilter->getLatencySamples() == 0 || std::invoke ([&]
+        {
+            if (auto* extension = juceFilter->getARAClientExtensions())
+                return ! extension->isBoundToARA();
+
+            jassertfalse;
+            return false;
+        }));
        #endif
         return rate > 0 ? juceFilter->getLatencySamples() / rate : 0;
     }
@@ -1981,7 +1993,7 @@ public:
                     return nil;
 
                #if JucePlugin_Enable_ARA
-                jassert (dynamic_cast<AudioProcessorEditorARAExtension*> (editorComp) != nullptr);
+                jassert (editorComp->getARAClientExtensions() != nullptr);
                 // for proper view embedding, ARA plug-ins must be resizable
                 jassert (editorComp->isResizable());
                #endif

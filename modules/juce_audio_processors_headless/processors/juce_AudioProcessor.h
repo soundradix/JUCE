@@ -37,6 +37,7 @@ namespace juce
 
 class AudioFormatReader;
 class AudioProcessorEditor;
+class AudioProcessorARAExtension;
 
 //==============================================================================
 /**
@@ -1122,7 +1123,7 @@ public:
         Prefer createEditorAndMakeActive().
     */
     [[deprecated ("Prefer createEditorAndMakeActive()")]]
-    AudioProcessorEditor* createEditorIfNecessary() { return createEditorAndMakeActive(); }
+    AudioProcessorEditor* createEditorIfNeeded() { return createEditorAndMakeActive(); }
 
     //==============================================================================
     /** Returns if AU should use high resolution (continious) instead of steps for better precision.
@@ -1358,6 +1359,16 @@ public:
         of the correct type in order to avoid this dynamic cast.
     */
     virtual VST3ClientExtensions* getVST3ClientExtensions();
+
+    /** Returns a non-owning pointer to an object that implements ARA specific information
+        regarding this AudioProcessor.
+
+        By default, for backwards compatibility, this will attempt to dynamic-cast this
+        AudioProcessor to AudioProcessorARAExtension.
+        It is recommended to override this function to return a pointer directly to an object
+        of the correct type in order to avoid this dynamic cast.
+    */
+    virtual AudioProcessorARAExtension* getARAClientExtensions();
 
     //==============================================================================
     /** Some plug-ins support sharing response curve data with the host so that it can

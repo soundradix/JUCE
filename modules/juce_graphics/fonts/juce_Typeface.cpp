@@ -1256,7 +1256,7 @@ private:
         };
 
         MemoryInputStream memoryStream { (const void*) testFontZip, std::size (testFontZip), false };
-        ZipFile zip { &memoryStream, false };
+        ZipFile zip { memoryStream };
 
         auto stream = rawToUniquePtr (zip.createStreamForEntry (zip.getIndexOfFileName ("test.otf")));
         jassert (stream != nullptr);

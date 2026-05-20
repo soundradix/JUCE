@@ -4,6 +4,53 @@
 
 ## Change
 
+72e1ba6a80bb163633622ee9694856cacc24e5b9 made AudioProcessor::createEditor()
+private. It also incorrectly renamed createEditorIfNeeded() to
+createEditorIfNecessary(). The old naming has now be reinstated.
+
+**Possible Issues**
+
+Code that calls createEditor() directly will fail to compile.
+
+**Workaround**
+
+To create an editor for an AudioProcessor, call
+AudioProcessor::createEditorAndMakeActive().
+
+**Rationale**
+
+In order for AudioProcessor::getActiveEditor() to return the correct result,
+the AudioProcessor must store a pointer to the newly-created editor after
+createEditor() returns. Allowing users to call createEditor() directly would
+prevent the internal editor pointer from being updated, breaking the behaviour
+of getActiveEditor().
+
+
+## Change
+
+The value returned by AlertWindow::show() has been changed so that it is
+consistent between native and non-native windows. The documentation has been
+updated to describe the new behaviour.
+
+**Possible Issues**
+
+Code that called this function to display a native alert window will behave
+differently.
+
+**Workaround**
+
+Code should be updated to respect the new return codes. See the documentation
+for an explanation of the possible return codes.
+
+**Rationale**
+
+Making the behaviour of this function consistent between native and non-native
+dialogs will make it easier to write bug-free code, especially in programs that
+might switch between dialog window types.
+
+
+## Change
+
 AudioPluginInstance::getPlatformSpecificData() has been removed.
 
 **Possible Issues**

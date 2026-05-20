@@ -972,7 +972,7 @@ private:
         GLuint current{};
     };
 
-    Values values = []
+    static Values getInitialValues()
     {
         if (! Traits::predicate())
             return Values{};
@@ -985,7 +985,9 @@ private:
         Traits::bind (current);
 
         return Values { previous, current };
-    }();
+    }
+
+    Values values = getInitialValues();
 };
 
 //==============================================================================

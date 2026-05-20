@@ -190,8 +190,22 @@ int Desktop::getNumMouseSources() const noexcept                                
 int Desktop::getNumDraggingMouseSources() const noexcept                        { return mouseSources->getNumDraggingMouseSources(); }
 MouseInputSource* Desktop::getMouseSource (int index) const noexcept            { return mouseSources->getMouseSource (index); }
 MouseInputSource* Desktop::getDraggingMouseSource (int index) const noexcept    { return mouseSources->getDraggingMouseSource (index); }
-MouseInputSource Desktop::getMainMouseSource() const noexcept                   { return MouseInputSource (mouseSources->sources.getUnchecked (0)); }
 void Desktop::beginDragAutoRepeat (int interval)                                { mouseSources->beginDragAutoRepeat (interval); }
+
+MouseInputSource Desktop::getMainMouseSource() const noexcept
+{
+    auto& sources = mouseSources->sources;
+
+    const auto firstMouse = std::find_if (sources.begin(), sources.end(), [] (auto& source)
+    {
+        return source->inputType == MouseInputSource::InputSourceType::mouse;
+    });
+
+    if (firstMouse != sources.end())
+        return MouseInputSource { *firstMouse };
+
+    return MouseInputSource (mouseSources->sources.getUnchecked (0));
+}
 
 //==============================================================================
 void Desktop::addFocusChangeListener    (FocusChangeListener* l)   { focusListeners.add (l); }

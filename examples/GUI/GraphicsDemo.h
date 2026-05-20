@@ -497,7 +497,7 @@ public:
     {
         lastSVGLoadTime = Time::getCurrentTime();
 
-        ZipFile icons (createAssetInputStream ("icons.zip").release(), true);
+        ZipFile icons { createAssetInputStream ("icons.zip") };
 
         // Load a random SVG file from our embedded icons.zip file.
         const std::unique_ptr<InputStream> svgFileStream (icons.createStreamForEntry (Random::getSystemRandom().nextInt (icons.getNumEntries())));

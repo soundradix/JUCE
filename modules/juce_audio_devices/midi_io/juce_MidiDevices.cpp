@@ -338,6 +338,7 @@ MidiOutput::MidiOutput (std::shared_ptr<ump::Session> s,
       storedInfo (i),
       group (g)
 {
+    mainPackets.reserve (2048);
 }
 
 Array<MidiDeviceInfo> MidiOutput::getAvailableDevices()

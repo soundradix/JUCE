@@ -36,10 +36,11 @@
 
 #if JUCE_INTERNAL_HAS_AU
 
+#include <AudioToolbox/AudioUnitUtilities.h>
+
 #if JUCE_MAC
 #include <AudioUnit/AUCocoaUIView.h>
 #include <CoreAudioKit/AUGenericView.h>
-#include <AudioToolbox/AudioUnitUtilities.h>
 
 #if JUCE_INTERNAL_HAS_ARA
  #include <ARA_API/ARAAudioUnit.h>
@@ -613,30 +614,45 @@ public:
 
         float getValue() const override
         {
+            return cachedValue;
+        }
+
+        void syncCachedValue()
+        {
             const ScopedLock sl (pluginInstance.lock);
 
-            AudioUnitParameterValue value = 0;
+            AudioUnitParameterValue newValue{};
 
-            if (auto* au = pluginInstance.audioUnit)
-            {
-                AudioUnitGetParameter (au, paramID, kAudioUnitScope_Global, 0, &value);
-                value = normaliseParamValue (value);
-            }
+            if (AudioUnitGetParameter (pluginInstance.audioUnit, paramID, kAudioUnitScope_Global, 0, &newValue) != noErr)
+                return;
 
-            return value;
+            cachedValue = normaliseParamValue (newValue);
+        }
+
+        void updateCachedValueAndNotify (float newValue)
+        {
+            cachedValue = newValue;
+            sendValueChangedMessageToListeners (newValue);
         }
 
         void setValue (float newValue) override
         {
             const ScopedLock sl (pluginInstance.lock);
 
-            if (auto* au = pluginInstance.audioUnit)
-            {
-                AudioUnitSetParameter (au, paramID, kAudioUnitScope_Global,
-                                       0, scaleParamValue (newValue), 0);
+            cachedValue = newValue;
 
-                sendParameterChangeEvent();
-            }
+            auto* au = pluginInstance.audioUnit;
+
+            if (au == nullptr)
+                return;
+
+            AudioUnitParameter parameter;
+            parameter.mParameterID = paramID;
+            parameter.mAudioUnit = au;
+            parameter.mScope = kAudioUnitScope_Global;
+            parameter.mElement = 0;
+
+            AUParameterSet (pluginInstance.eventListenerRef, nullptr, &parameter, scaleParamValue (newValue), 0);
         }
 
         float getDefaultValue() const override
@@ -802,6 +818,7 @@ public:
         const bool valuesHaveStrings, isSwitch;
         String valueLabel;
         const AudioUnitParameterValue defaultValue;
+        AudioUnitParameterValue cachedValue = defaultValue;
         StringArray auValueStrings;
     };
 
@@ -809,9 +826,7 @@ public:
         : AudioPluginInstance (getBusesProperties (au)),
           auComponent (AudioComponentInstanceGetComponent (au)),
           audioUnit (au),
-        #if JUCE_MAC
           eventListenerRef (nullptr),
-        #endif
           midiConcatenator (2048)
     {
         using namespace AudioUnitFormatHelpers;
@@ -874,9 +889,7 @@ public:
     // called from the destructor above
     void cleanup()
     {
-       #if JUCE_MAC
         disposeEventListener();
-       #endif
 
         if (prepared)
             releaseResources();
@@ -892,10 +905,7 @@ public:
         setLatencySamples (0);
         refreshParameterList();
         setPluginCallbacks();
-
-       #if JUCE_MAC
         createEventListener();
-       #endif
 
         return true;
     }
@@ -1488,15 +1498,21 @@ public:
     //==============================================================================
     void sendAllParametersChangedEvents()
     {
-       #if JUCE_MAC
         jassert (audioUnit != nullptr);
+
+        for (const auto& idAndParam : paramIDToParameter)
+        {
+            if (auto* param = idAndParam.second)
+            {
+                param->syncCachedValue();
+            }
+        }
 
         AudioUnitParameter param;
         param.mAudioUnit = audioUnit;
         param.mParameterID = kAUParameterListener_AnyParameter;
 
         AUParameterListenerNotify (nullptr, nullptr, &param);
-       #endif
     }
 
     //==============================================================================
@@ -1874,7 +1890,6 @@ private:
                     AudioUnitSetProperty (parent.audioUnit, kAudioUnitProperty_BypassEffect,
                                           kAudioUnitScope_Global, 0, &value, sizeof (UInt32));
 
-                   #if JUCE_MAC
                     jassert (parent.audioUnit != nullptr);
 
                     AudioUnitEvent ev;
@@ -1885,7 +1900,6 @@ private:
                     ev.mArgument.mProperty.mElement     = 0;
 
                     AUEventListenerNotify (parent.eventListenerRef, nullptr, &ev);
-                   #endif
                 }
             }
         }
@@ -1934,9 +1948,7 @@ private:
     HeapBlock<AUChannelInfo> channelInfos;
 
     AudioUnit audioUnit;
-   #if JUCE_MAC
     AUEventListenerRef eventListenerRef;
-   #endif
 
     std::map<UInt32, AUInstanceParameter*> paramIDToParameter;
 
@@ -1979,7 +1991,6 @@ private:
         }
     }
 
-   #if JUCE_MAC
     void disposeEventListener()
     {
         if (eventListenerRef != nullptr)
@@ -2052,7 +2063,7 @@ private:
             return;
 
         if (event.mEventType == kAudioUnitEvent_ParameterValueChange)
-            param->sendValueChangedMessageToListeners (param->normaliseParamValue (newValue));
+            param->updateCachedValueAndNotify (param->normaliseParamValue (newValue));
         else if (event.mEventType == kAudioUnitEvent_BeginParameterChangeGesture)
             param->beginChangeGesture();
         else if (event.mEventType == kAudioUnitEvent_EndParameterChangeGesture)
@@ -2109,7 +2120,6 @@ private:
             param->setLabel (getParamLabel (info.get()));
         }
     }
-   #endif
 
     /*  Some fields in the AudioUnitParameterInfo may need to be released after use,
         so we'll do that using RAII.

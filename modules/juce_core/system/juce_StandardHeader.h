@@ -59,12 +59,27 @@
 /** @endcond */
 
 //==============================================================================
+#include "juce_CompilerSupport.h"
+#include "juce_CompilerWarnings.h"
+
+//==============================================================================
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cmath>
 #include <condition_variable>
 #include <cstddef>
+
+// There's a template specialisation to std::wstring_convert in
+// wstring_convert.h that triggers a warning on Xcode 26.4.1 when used by the
+// VST3 SDK. It cannot be suppressed at the call site. This file is included
+// in <locale>, and would transitively be included by <functional>.
+#if defined (__apple_build_version__)
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wdeprecated-declarations")
+#include <locale>
+JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+#endif
+
 #include <functional>
 #include <future>
 #include <iomanip>
@@ -90,8 +105,6 @@
 #include <vector>
 
 //==============================================================================
-#include "juce_CompilerSupport.h"
-#include "juce_CompilerWarnings.h"
 #include "juce_PlatformDefs.h"
 
 //==============================================================================

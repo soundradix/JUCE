@@ -1254,7 +1254,9 @@ public:
     Steinberg::TBool PLUGIN_API isViewEmbeddingSupported() override
     {
         if (auto* pluginInstance = getPluginInstance())
-            return (Steinberg::TBool) dynamic_cast<AudioProcessorARAExtension*> (pluginInstance)->isEditorView();
+            if (auto* extension = pluginInstance->getARAClientExtensions())
+                return (Steinberg::TBool) extension->isEditorView();
+
         return (Steinberg::TBool) false;
     }
 
@@ -1616,7 +1618,14 @@ public:
             auto latencySamples = pluginInstance->getLatencySamples();
 
            #if JucePlugin_Enable_ARA
-            jassert (latencySamples == 0 || ! dynamic_cast<AudioProcessorARAExtension*> (pluginInstance)->isBoundToARA());
+            jassert (latencySamples == 0 || std::invoke ([&]
+            {
+                if (auto* extension = pluginInstance->getARAClientExtensions())
+                    return ! extension->isBoundToARA();
+
+                jassertfalse;
+                return false;
+            }));
            #endif
 
             if (details.latencyChanged && latencySamples != lastLatencySamples)
@@ -2381,7 +2390,7 @@ private:
                 pluginEditor.reset (plugin.createEditorAndMakeActive());
 
                #if JucePlugin_Enable_ARA
-                jassert (dynamic_cast<AudioProcessorEditorARAExtension*> (pluginEditor.get()) != nullptr);
+                jassert (pluginEditor->getARAClientExtensions() != nullptr);
                 // for proper view embedding, ARA plug-ins must be resizable
                 jassert (pluginEditor->isResizable());
                #endif
@@ -3879,10 +3888,14 @@ private:
     }
 
     const ARA::ARAPlugInExtensionInstance* PLUGIN_API bindToDocumentControllerWithRoles (ARA::ARADocumentControllerRef documentControllerRef,
-                                                                                         ARA::ARAPlugInInstanceRoleFlags knownRoles, ARA::ARAPlugInInstanceRoleFlags assignedRoles) SMTG_OVERRIDE
+                                                                                         ARA::ARAPlugInInstanceRoleFlags knownRoles,
+                                                                                         ARA::ARAPlugInInstanceRoleFlags assignedRoles) SMTG_OVERRIDE
     {
-        AudioProcessorARAExtension* araAudioProcessorExtension = dynamic_cast<AudioProcessorARAExtension*> (pluginInstance);
-        return araAudioProcessorExtension->bindToARA (documentControllerRef, knownRoles, assignedRoles);
+        if (auto* araAudioProcessorExtension = pluginInstance->getARAClientExtensions())
+            return araAudioProcessorExtension->bindToARA (documentControllerRef, knownRoles, assignedRoles);
+
+        jassertfalse;
+        return nullptr;
     }
    #endif
 
