@@ -49,6 +49,7 @@ public:
     //==============================================================================
     void setFill (const FillType&) override;
     void setOpacity (float) override;
+    void setImageBlendMode (BlendMode) override;
     void setInterpolationQuality (Graphics::ResamplingQuality) override;
 
     //==============================================================================

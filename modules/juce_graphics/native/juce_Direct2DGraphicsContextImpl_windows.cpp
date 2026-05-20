@@ -539,6 +539,7 @@ public:
     FillType fillType;
 
     D2D1_INTERPOLATION_MODE interpolationMode = D2D1_INTERPOLATION_MODE_LINEAR;
+    D2D1_COMPOSITE_MODE imageBlendMode = D2D1_COMPOSITE_MODE_SOURCE_OVER;
 
     JUCE_LEAK_DETECTOR (SavedState)
 };

@@ -136,6 +136,11 @@ void LowLevelGraphicsSoftwareRenderer::setFill (const FillType& fillType)
     impl->setFill (fillType);
 }
 
+void LowLevelGraphicsSoftwareRenderer::setImageBlendMode (BlendMode blendMode)
+{
+    impl->setImageBlendMode (blendMode);
+}
+
 void LowLevelGraphicsSoftwareRenderer::setOpacity (float newOpacity)
 {
     impl->setOpacity (newOpacity);

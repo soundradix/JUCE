@@ -985,12 +985,6 @@ struct StateHelpers
         }
 
         template <typename QuadQueueType>
-        void setPremultipliedBlendingMode (QuadQueueType& quadQueue) noexcept
-        {
-            setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        }
-
-        template <typename QuadQueueType>
         void setBlendFunc (QuadQueueType& quadQueue, GLenum src, GLenum dst)
         {
             if (! blendingEnabled)
@@ -1021,12 +1015,29 @@ struct StateHelpers
         }
 
         template <typename QuadQueueType>
-        void setBlendMode (QuadQueueType& quadQueue, bool replaceExistingContents) noexcept
+        void setBlendMode (QuadQueueType& quadQueue, BlendMode mode) noexcept
         {
-            if (replaceExistingContents)
-                disableBlend (quadQueue);
-            else
-                setPremultipliedBlendingMode (quadQueue);
+            switch (mode)
+            {
+                case BlendMode::source:
+                    setBlendFunc (quadQueue, GL_ONE, GL_ZERO);
+                    return;
+
+                case BlendMode::sourceOver:
+                    setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                    return;
+
+                case BlendMode::destinationIn:
+                    setBlendFunc (quadQueue, GL_ZERO, GL_SRC_ALPHA);
+                    return;
+
+                case BlendMode::destinationOut:
+                    setBlendFunc (quadQueue, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+                    return;
+            }
+
+            jassertfalse;
+            setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
 
     private:
@@ -1633,7 +1644,7 @@ struct GLState
     {
         JUCE_CHECK_OPENGL_ERROR
         activeTextures.disableTextures (shaderQuadQueue);
-        blendMode.setPremultipliedBlendingMode (shaderQuadQueue);
+        blendMode.setBlendMode (shaderQuadQueue, BlendMode::sourceOver);
         JUCE_CHECK_OPENGL_ERROR
 
         if (maskArea != nullptr)
@@ -1741,11 +1752,14 @@ struct GLState
         JUCE_CHECK_OPENGL_ERROR
     }
 
-    void setShaderForTiledImageFill (const TextureInfo& textureInfo, const AffineTransform& transform,
-                                     int maskTextureID, const Rectangle<int>* maskArea, bool isTiledFill)
+    void setShaderForTiledImageFill (const TextureInfo& textureInfo,
+                                     const AffineTransform& transform,
+                                     int maskTextureID,
+                                     const Rectangle<int>* maskArea,
+                                     bool isTiledFill,
+                                     BlendMode mode)
     {
-        blendMode.setPremultipliedBlendingMode (shaderQuadQueue);
-
+        blendMode.setBlendMode (shaderQuadQueue, mode);
         auto programs = currentShader.programs;
 
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
@@ -1877,7 +1891,13 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
                                  const AffineTransform& trans, Graphics::ResamplingQuality, bool tiledFill) const
     {
         state->shaderQuadQueue.flush();
-        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src), trans, 0, nullptr, tiledFill);
+
+        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src),
+                                           trans,
+                                           0,
+                                           nullptr,
+                                           tiledFill,
+                                           imageBlendMode);
 
         state->shaderQuadQueue.add (iter, PixelARGB ((uint8) alpha, (uint8) alpha, (uint8) alpha, (uint8) alpha));
         state->shaderQuadQueue.flush();
@@ -1898,7 +1918,12 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
         if (! isUsingCustomShader)
         {
             state->activeTextures.disableTextures (state->shaderQuadQueue);
-            state->blendMode.setBlendMode (state->shaderQuadQueue, replaceContents);
+
+            if (replaceContents)
+                state->blendMode.disableBlend (state->shaderQuadQueue);
+            else
+                state->blendMode.setBlendMode (state->shaderQuadQueue, imageBlendMode);
+
             state->setShader (state->currentShader.programs->solidColourProgram);
         }
 

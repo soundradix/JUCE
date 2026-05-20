@@ -73,6 +73,9 @@ public:
     */
     void setOpacity (float newOpacity);
 
+    /** Changes the blend mode used for drawing images. */
+    void setImageBlendMode (BlendMode newMode);
+
     /** Sets the context to use a gradient for its fill pattern. */
     void setGradientFill (const ColourGradient& gradient);
 

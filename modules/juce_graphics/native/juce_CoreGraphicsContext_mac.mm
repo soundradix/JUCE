@@ -318,6 +318,7 @@ struct CoreGraphicsContext::SavedState
     CGAffineTransform textMatrix = CGAffineTransformIdentity,
                inverseTextMatrix = CGAffineTransformIdentity;
     detail::GradientPtr gradient = {};
+    BlendMode imageBlendMode = BlendMode::sourceOver;
 };
 
 //==============================================================================
@@ -342,7 +343,7 @@ CoreGraphicsContext::CoreGraphicsContext (CGContextRef c, float h)
    #endif
 
     CGContextSetShouldAntialias (context.get(), true);
-    CGContextSetBlendMode (context.get(), kCGBlendModeNormal);
+    activateBlendMode (BlendMode::sourceOver);
     rgbColourSpace.reset (CGColorSpaceCreateWithName (kCGColorSpaceSRGB));
     greyColourSpace.reset (CGColorSpaceCreateWithName (kCGColorSpaceGenericGrayGamma2_2));
     setFont (FontOptions());
@@ -582,6 +583,25 @@ void CoreGraphicsContext::setOpacity (float newOpacity)
     setFill (state->fillType);
 }
 
+static CGBlendMode getCGBlendMode (BlendMode mode)
+{
+    switch (mode)
+    {
+        case BlendMode::source:         return kCGBlendModeCopy;
+        case BlendMode::sourceOver:     return kCGBlendModeNormal;
+        case BlendMode::destinationIn:  return kCGBlendModeDestinationIn;
+        case BlendMode::destinationOut: return kCGBlendModeDestinationOut;
+    }
+
+    jassertfalse;
+    return kCGBlendModeNormal;
+}
+
+void CoreGraphicsContext::setImageBlendMode (BlendMode newMode)
+{
+    state->imageBlendMode = newMode;
+}
+
 void CoreGraphicsContext::setInterpolationQuality (Graphics::ResamplingQuality quality)
 {
     switch (quality)
@@ -631,9 +651,9 @@ void CoreGraphicsContext::fillCGRect (const CGRect& cgRect, bool replaceExisting
 
     if (replaceExistingContents)
     {
-        CGContextSetBlendMode (context.get(), kCGBlendModeCopy);
+        const auto previous = activateBlendMode (BlendMode::source);
+        const ScopeGuard restoreBlendMode { [this, previous] { activateBlendMode (previous); } };
         fillCGRect (cgRect, false);
-        CGContextSetBlendMode (context.get(), kCGBlendModeNormal);
         return;
     }
 
@@ -800,6 +820,13 @@ void CoreGraphicsContext::drawLineWithThickness (const Line<float>& line, float 
     drawCurrentPath (kCGPathFill);
 }
 
+BlendMode CoreGraphicsContext::activateBlendMode (juce::BlendMode mode)
+{
+    const auto previous = std::exchange (lastBlendMode, mode);
+    CGContextSetBlendMode(context.get(), getCGBlendMode (mode));
+    return previous;
+}
+
 void CoreGraphicsContext::drawImage (const Image& sourceImage, const AffineTransform& transform)
 {
     drawImage (sourceImage, transform, false);
@@ -807,6 +834,9 @@ void CoreGraphicsContext::drawImage (const Image& sourceImage, const AffineTrans
 
 void CoreGraphicsContext::drawImage (const Image& sourceImage, const AffineTransform& transform, bool fillEntireClipAsTiles)
 {
+    const auto nonImageBlendMode = activateBlendMode (state->imageBlendMode);
+    const ScopeGuard restoreBlendMode { [this, nonImageBlendMode] { activateBlendMode (nonImageBlendMode); } };
+
     auto iw = sourceImage.getWidth();
     auto ih = sourceImage.getHeight();
 

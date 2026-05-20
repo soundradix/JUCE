@@ -708,6 +708,7 @@ std::unique_ptr<LowLevelGraphicsContext> Direct2DPixelData::createLowLevelContex
             void endTransparencyLayer() override {}
             void setFill (const FillType&) override {}
             void setOpacity (float) override {}
+            void setImageBlendMode (BlendMode) override {}
             void setInterpolationQuality (Graphics::ResamplingQuality) override {}
             void fillRect (const Rectangle<int>&, bool) override {}
             void fillRect (const Rectangle<float>&) override {}

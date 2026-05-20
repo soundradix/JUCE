@@ -668,6 +668,25 @@ void Direct2DGraphicsContext::setOpacity (float newOpacity)
         currentState->updateCurrentBrush();
 }
 
+static D2D1_COMPOSITE_MODE getD2DCompositeMode (BlendMode mode)
+{
+    switch (mode)
+    {
+        case BlendMode::sourceOver:     return D2D1_COMPOSITE_MODE_SOURCE_OVER;
+        case BlendMode::source:         return D2D1_COMPOSITE_MODE_SOURCE_COPY;
+        case BlendMode::destinationIn:  return D2D1_COMPOSITE_MODE_DESTINATION_IN;
+        case BlendMode::destinationOut: return D2D1_COMPOSITE_MODE_DESTINATION_OUT;
+    }
+
+    jassertfalse;
+    return D2D1_COMPOSITE_MODE_SOURCE_OVER;
+}
+
+void Direct2DGraphicsContext::setImageBlendMode (BlendMode newMode)
+{
+    currentState->imageBlendMode = getD2DCompositeMode (newMode);
+}
+
 void Direct2DGraphicsContext::setInterpolationQuality (Graphics::ResamplingQuality quality)
 {
     switch (quality)
@@ -891,6 +910,8 @@ void Direct2DGraphicsContext::drawImage (const Image& imageIn, const AffineTrans
         }
 
         const auto imageTransform = currentState->currentTransform.getTransformWith (transform);
+        const auto blendMode = currentState->imageBlendMode;
+        const auto opacity = currentState->fillType.getOpacity();
 
         auto drawTiles = [&] (auto&& getRect)
         {
@@ -910,37 +931,72 @@ void Direct2DGraphicsContext::drawImage (const Image& imageIn, const AffineTrans
                 const auto [srcConverted, dstConverted] = std::tuple (D2DUtilities::toRECT_F (src),
                                                                       D2DUtilities::toRECT_F (dst));
 
-                if (page.bitmap->GetPixelFormat().format == DXGI_FORMAT_A8_UNORM)
-                {
-                    const auto lastColour = currentState->colourBrush->GetColor();
-                    const auto lastMode = deviceContext->GetAntialiasMode();
+                const auto lastMode = deviceContext->GetAntialiasMode();
 
-                    currentState->colourBrush->SetColor (D2D1::ColorF (1.0f, 1.0f, 1.0f, currentState->fillType.getOpacity()));
+                if (pagesAndArea.pages.size() > 1)
                     deviceContext->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
-                    deviceContext->FillOpacityMask (page.bitmap,
-                                                    currentState->colourBrush,
-                                                    dstConverted,
-                                                    srcConverted);
 
-                    deviceContext->SetAntialiasMode (lastMode);
-                    currentState->colourBrush->SetColor (lastColour);
+                if (blendMode == D2D1_COMPOSITE_MODE_SOURCE_OVER)
+                {
+                    if (page.bitmap->GetPixelFormat().format == DXGI_FORMAT_A8_UNORM)
+                    {
+                        const auto lastColour = currentState->colourBrush->GetColor();
+
+                        currentState->colourBrush->SetColor (D2D1::ColorF (1.0f,
+                                                                           1.0f,
+                                                                           1.0f,
+                                                                           opacity));
+
+                        deviceContext->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+                        deviceContext->FillOpacityMask (page.bitmap,
+                                                        currentState->colourBrush,
+                                                        dstConverted,
+                                                        srcConverted);
+
+                        currentState->colourBrush->SetColor (lastColour);
+                    }
+                    else
+                    {
+                        deviceContext->DrawBitmap (page.bitmap,
+                                                   dstConverted,
+                                                   opacity,
+                                                   currentState->interpolationMode,
+                                                   srcConverted,
+                                                   {});
+                    }
                 }
                 else
                 {
-                    const auto lastMode = deviceContext->GetAntialiasMode();
+                    if (approximatelyEqual (opacity, 1.0f))
+                    {
+                        deviceContext->DrawImage (page.bitmap,
+                                                  nullptr,
+                                                  &srcConverted,
+                                                  currentState->interpolationMode,
+                                                  blendMode);
+                    }
+                    else
+                    {
+                        ComSmartPtr<ID2D1Effect> effect;
+                        if (const auto hr = deviceContext->CreateEffect (CLSID_D2D1Opacity, effect.resetAndGetPointerAddress());
+                            FAILED (hr) || effect == nullptr)
+                        {
+                            jassertfalse;
+                            return;
+                        }
 
-                    if (pagesAndArea.pages.size() > 1)
-                        deviceContext->SetAntialiasMode (D2D1_ANTIALIAS_MODE_ALIASED);
+                        effect->SetInput (0, page.bitmap);
+                        effect->SetValue (D2D1_OPACITY_PROP_OPACITY, opacity);
 
-                    deviceContext->DrawBitmap (page.bitmap,
-                                               dstConverted,
-                                               currentState->fillType.getOpacity(),
-                                               currentState->interpolationMode,
-                                               srcConverted,
-                                               {});
-
-                    deviceContext->SetAntialiasMode (lastMode);
+                        deviceContext->DrawImage (effect.get(),
+                                                  nullptr,
+                                                  &srcConverted,
+                                                  currentState->interpolationMode,
+                                                  blendMode);
+                    }
                 }
+
+                deviceContext->SetAntialiasMode (lastMode);
             }
         };
 
@@ -949,7 +1005,9 @@ void Direct2DGraphicsContext::drawImage (const Image& imageIn, const AffineTrans
                                                  && 0.0f < imageTransform.mat00
                                                  && 0.0f < imageTransform.mat11);
 
-        if (canDrawWithoutTransform)
+        // DrawImage used by the advanced blend modes cannot transform between source and
+        // destination rectangles internally.
+        if (canDrawWithoutTransform && blendMode == D2D1_COMPOSITE_MODE_SOURCE_OVER)
         {
             drawTiles ([&] (auto intersection)
             {
