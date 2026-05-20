@@ -29,25 +29,6 @@ PathStrokeType::PathStrokeType (float strokeThickness, JointStyle joint, EndCapS
 {
 }
 
-PathStrokeType::PathStrokeType (const PathStrokeType& other) noexcept
-    : thickness (other.thickness),
-      jointStyle (other.jointStyle),
-      endStyle (other.endStyle)
-{
-}
-
-PathStrokeType& PathStrokeType::operator= (const PathStrokeType& other) noexcept
-{
-    thickness = other.thickness;
-    jointStyle = other.jointStyle;
-    endStyle = other.endStyle;
-    return *this;
-}
-
-PathStrokeType::~PathStrokeType() noexcept
-{
-}
-
 bool PathStrokeType::operator== (const PathStrokeType& other) const noexcept
 {
     const auto tie = [] (const PathStrokeType& p) { return std::tie (p.thickness, p.jointStyle, p.endStyle); };
@@ -655,14 +636,57 @@ void PathStrokeType::createStrokedPath (Path& destPath, const Path& sourcePath,
                                      transform, extraAccuracy, nullptr);
 }
 
+struct PositionInDashArray
+{
+    int startIndex;
+    float lengthReductionForFirstDash;
+};
+
+static PositionInDashArray calculatePositionInDashArray (Span<const float> dashLengths, float dashOffset)
+{
+    const auto sumOfDashLengths = std::accumulate (dashLengths.begin(), dashLengths.end(), 0.0f);
+    dashOffset = std::fmod (dashOffset, sumOfDashLengths);
+
+    if (approximatelyEqual (dashOffset, 0.0f) || approximatelyEqual (sumOfDashLengths, 0.0f))
+        return { 0, 0.0f };
+
+    const auto forward = dashOffset >= 0.0f;
+
+    int safetyLoopCounter = 0;
+    auto offset = std::abs (dashOffset);
+    for (int i = forward ? 0 : -1;; i += forward ? 1 : -1)
+    {
+        const auto index = (size_t) negativeAwareModulo (i, (int) dashLengths.size());
+        const auto currentDash = dashLengths[index];
+        const auto omitFromCurrentDash = forward ? offset : std::max (0.0f, currentDash - offset);
+
+        offset -= currentDash;
+
+        // We can't omit all of the current dash, otherwise we'd have to draw a zero-length segment,
+        // which would cause a division problem in our implementation.
+        if (offset <= 0.0f && omitFromCurrentDash < currentDash)
+            return { (int) index, omitFromCurrentDash };
+
+        if (++safetyLoopCounter > 10000)
+        {
+            // We aren't converging quickly enough on a solution. Maybe the dash parameters
+            // are ill conditioned?
+            jassertfalse;
+            return { 0, 0.0f };
+        }
+    }
+}
+
 void PathStrokeType::createDashedStroke (Path& destPath,
                                          const Path& sourcePath,
                                          const float* dashLengths,
                                          int numDashLengths,
                                          const AffineTransform& transform,
-                                         float extraAccuracy) const
+                                         float extraAccuracy,
+                                         float dashOffset) const
 {
     jassert (extraAccuracy > 0);
+    jassert (numDashLengths > 0);
 
     if (thickness <= 0)
         return;
@@ -671,8 +695,11 @@ void PathStrokeType::createDashedStroke (Path& destPath,
     PathFlatteningIterator it (sourcePath, transform, Path::defaultToleranceForMeasurement / extraAccuracy);
 
     bool first = true;
-    int dashNum = 0;
-    float pos = 0.0f, lineLen = 0.0f, lineEndPos = 0.0f;
+
+    const auto positionInDashArray = calculatePositionInDashArray ({ dashLengths, (size_t) numDashLengths }, dashOffset);
+
+    int dashNum = positionInDashArray.startIndex;
+    float pos = -positionInDashArray.lengthReductionForFirstDash, lineLen = 0.0f, lineEndPos = 0.0f;
     float dx = 0.0f, dy = 0.0f;
 
     for (;;)
