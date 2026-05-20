@@ -137,6 +137,7 @@ namespace juce
 #include "effects/juce_DropShadowEffect.h"
 #include "effects/juce_GlowEffect.h"
 #include "detail/juce_Unicode.h"
+#include "detail/juce_TwoPointConicalGradient.h"
 
 #if JUCE_GRAPHICS_INCLUDE_RENDERING_HELPERS
  #include "native/juce_RenderingHelpers.h"

@@ -406,13 +406,14 @@ namespace GradientPixelIterators
             : lookupTable (colours),
               numEntries (numColours),
               gx1 (gradient.point1.x),
-              gy1 (gradient.point1.y)
+              gy1 (gradient.point1.y),
+              spreadFunction (detail::SpreadMethods::getFunction (gradient.spreadMethod))
         {
             jassert (numColours >= 0);
-            auto diff = gradient.point1 - gradient.point2;
-            maxDist = diff.x * diff.x + diff.y * diff.y;
-            invScale = numEntries / std::sqrt (maxDist);
-            jassert (roundToInt (std::sqrt (maxDist) * invScale) <= numEntries);
+            detail::RadialGradientView rg { &gradient };
+            diff = rg.getEndCircle().r;
+            invScale = numEntries / diff;
+            jassert (roundToInt (diff * invScale) <= numEntries);
         }
 
         forcedinline void setY (int y) noexcept
@@ -427,13 +428,15 @@ namespace GradientPixelIterators
             x *= x;
             x += dy;
 
-            return lookupTable[x >= maxDist ? numEntries : roundToInt (std::sqrt (x) * invScale)];
+            const auto t = (float) std::sqrt (x) / (float) diff;
+            return lookupTable[jmin (numEntries, roundToInt (spreadFunction (t) * (float) numEntries))];
         }
 
         const PixelARGB* const lookupTable;
         const int numEntries;
         const double gx1, gy1;
-        double maxDist, invScale, dy;
+        double diff, invScale, dy;
+        float (*spreadFunction) (float) = detail::SpreadMethods::getFunction (ColourGradient::SpreadMethod::pad);
 
         JUCE_DECLARE_NON_COPYABLE (Radial)
     };
@@ -466,10 +469,8 @@ namespace GradientPixelIterators
             x *= x;
             x += y * y;
 
-            if (x >= maxDist)
-                return lookupTable[numEntries];
-
-            return lookupTable[jmin (numEntries, roundToInt (std::sqrt (x) * invScale))];
+            const auto t = (float) std::sqrt (x) / (float) diff;
+            return lookupTable[jmin (numEntries, roundToInt (spreadFunction (t) * (float) numEntries))];
         }
 
     private:
@@ -477,6 +478,43 @@ namespace GradientPixelIterators
         const AffineTransform inverseTransform;
 
         JUCE_DECLARE_NON_COPYABLE (TransformedRadial)
+    };
+
+    //==============================================================================
+    /** Iterates the colour of pixels in a two-point skewed radial gradient */
+    struct TwoPointRadial   : public Radial
+    {
+        TwoPointRadial (const ColourGradient& gradient,
+                       const AffineTransform& transform,
+                       const PixelARGB* colours, int numColours)
+            : Radial (gradient, transform, colours, numColours),
+              inverseTransform (transform.inverted()),
+              twoPointGradient (detail::TwoPointConicalGradient::create (gradient).value())
+        {
+        }
+
+        forcedinline void setY (int y) noexcept
+        {
+            lineY = y;
+        }
+
+        inline PixelARGB getPixel (int px) const noexcept
+        {
+            Point<float> p { (float) px, (float) lineY };
+            const auto pi = p.transformedBy (inverseTransform);
+
+            if (auto w = twoPointGradient.calculateWeight (pi))
+                return lookupTable[jmin (numEntries, roundToInt (spreadFunction (*w) * (float) numEntries))];
+
+            return {};
+        }
+
+    private:
+        const AffineTransform inverseTransform;
+        int lineY = 0;
+        detail::TwoPointConicalGradient twoPointGradient;
+
+        JUCE_DECLARE_NON_COPYABLE (TwoPointRadial)
     };
 }
 
@@ -1597,24 +1635,30 @@ namespace EdgeTableFillers
     void renderGradient (Iterator& iter, const Image::BitmapData& destData, const ColourGradient& g, const AffineTransform& transform,
                          const PixelARGB* lookupTable, int numLookupEntries, bool isIdentity, DestPixelType*)
     {
-        if (g.isRadial)
-        {
-            if (isIdentity)
-            {
-                EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::Radial> renderer (destData, g, transform, lookupTable, numLookupEntries);
-                iter.iterate (renderer);
-            }
-            else
-            {
-                EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::TransformedRadial> renderer (destData, g, transform, lookupTable, numLookupEntries);
-                iter.iterate (renderer);
-            }
-        }
-        else
+        if (! g.isRadial)
         {
             EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::Linear> renderer (destData, g, transform, lookupTable, numLookupEntries);
             iter.iterate (renderer);
+            return;
         }
+
+        if (detail::TwoPointConicalGradient::create (g).has_value())
+        {
+            EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::TwoPointRadial> renderer (destData, g, transform, lookupTable, numLookupEntries);
+            iter.iterate (renderer);
+            return;
+        }
+
+        if (isIdentity)
+        {
+            EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::Radial> renderer (destData, g, transform, lookupTable, numLookupEntries);
+            iter.iterate (renderer);
+            return;
+        }
+
+        EdgeTableFillers::Gradient<DestPixelType, GradientPixelIterators::TransformedRadial> renderer (destData, g, transform, lookupTable, numLookupEntries);
+        iter.iterate (renderer);
+        return;
     }
 }
 
@@ -2438,6 +2482,30 @@ public:
         }
     }
 
+    void fillAllWithGradient (typename BaseRegionType::Ptr shapeToFill)
+    {
+        auto g2 = *(fillType.gradient);
+        g2.multiplyOpacity (fillType.getOpacity());
+        auto t = transform.getTransformWith (fillType.transform).translated (-0.5f, -0.5f);
+
+        bool isIdentity = t.isOnlyTranslation();
+
+        if (isIdentity)
+        {
+            // if our translation doesn't involve any distortion, we can speed it up
+            g2.point1.applyTransform (t);
+            g2.point2.applyTransform (t);
+            t = {};
+        }
+
+        shapeToFill->fillAllWithGradient (getThis(), g2, t, isIdentity);
+    }
+
+    void dispatchFillAllWithGradient (typename BaseRegionType::Ptr shapeToFill)
+    {
+        fillAllWithGradient (shapeToFill);
+    }
+
     void fillShape (typename BaseRegionType::Ptr shapeToFill, bool replaceContents)
     {
         jassert (clip != nullptr);
@@ -2448,22 +2516,7 @@ public:
             if (fillType.isGradient())
             {
                 jassert (! replaceContents); // that option is just for solid colours
-
-                auto g2 = *(fillType.gradient);
-                g2.multiplyOpacity (fillType.getOpacity());
-                auto t = transform.getTransformWith (fillType.transform).translated (-0.5f, -0.5f);
-
-                bool isIdentity = t.isOnlyTranslation();
-
-                if (isIdentity)
-                {
-                    // if our translation doesn't involve any distortion, we can speed it up
-                    g2.point1.applyTransform (t);
-                    g2.point2.applyTransform (t);
-                    t = {};
-                }
-
-                shapeToFill->fillAllWithGradient (getThis(), g2, t, isIdentity);
+                dispatchFillAllWithGradient (shapeToFill);
             }
             else if (fillType.isTiledImage())
             {

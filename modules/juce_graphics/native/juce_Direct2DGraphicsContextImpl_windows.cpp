@@ -455,15 +455,21 @@ public:
 
         if (fillType.isGradient())
         {
-            const auto p1 = fillType.gradient->point1;
-            const auto p2 = fillType.gradient->point2;
+            const auto& g = *fillType.gradient;
+            const auto p1 = g.point1;
+            const auto p2 = g.point2;
 
             if (fillType.gradient->isRadial)
             {
-                const auto radius = p2.getDistanceFrom (p1);
-                radialGradient->SetRadiusX (radius);
-                radialGradient->SetRadiusY (radius);
-                radialGradient->SetCenter ({ p1.x, p1.y });
+                const auto endCircleOrigin = g.endRadius >= 0.0f ? p2 : p1;
+                const auto endRadius = g.endRadius >= 0.0f ? g.endRadius : p2.getDistanceFrom (p1);
+                const auto gradientOrigin = p1;
+                const auto gradientOffset = gradientOrigin - endCircleOrigin;
+
+                radialGradient->SetRadiusX (endRadius);
+                radialGradient->SetRadiusY (endRadius);
+                radialGradient->SetCenter ({ endCircleOrigin.x, endCircleOrigin.y });
+                radialGradient->SetGradientOriginOffset ({ gradientOffset.x, gradientOffset.y });
             }
             else
             {

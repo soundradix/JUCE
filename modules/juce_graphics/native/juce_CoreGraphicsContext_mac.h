@@ -111,6 +111,7 @@ private:
     CGRect convertToCGRectFlipped (RectType r) const noexcept;
     void setContextClipToCurrentPath (bool useNonZeroWinding);
     void drawCurrentPath (CGPathDrawingMode mode);
+    void dispatchDrawGradient();
     void drawGradient();
     void createPath (const Path&, const AffineTransform&) const;
     void flip() const;

@@ -647,7 +647,7 @@ void CoreGraphicsContext::fillCGRect (const CGRect& cgRect, bool replaceExisting
     CGContextClipToRect (context.get(), cgRect);
 
     if (state->fillType.isGradient())
-        drawGradient();
+        dispatchDrawGradient();
     else
         drawImage (state->fillType.image, state->fillType.transform, true);
 }
@@ -669,7 +669,7 @@ void CoreGraphicsContext::drawCurrentPath (CGPathDrawingMode mode)
                                  || mode == kCGPathFillStroke);
 
     if (state->fillType.isGradient())
-        drawGradient();
+        dispatchDrawGradient();
     else
         drawImage (state->fillType.image, state->fillType.transform, true);
 }
@@ -856,7 +856,7 @@ void CoreGraphicsContext::fillRectList (const RectangleList<float>& list)
     CGContextClipToRects (context.get(), rects.data(), rects.size());
 
     if (state->fillType.isGradient())
-        drawGradient();
+        dispatchDrawGradient();
     else
         drawImage (state->fillType.image, state->fillType.transform, true);
 }
@@ -959,6 +959,31 @@ static CGGradientRef createGradient (const ColourGradient& g, CGColorSpaceRef co
     return CGGradientCreateWithColorComponents (colourSpace, components, locations, (size_t) numColours);
 }
 
+static Rectangle<int> convertToClipInt (const CGRect& cgRect, CGFloat flipHeight)
+{
+    return convertToRectFloat (cgRect).withY ((float) (flipHeight - cgRect.origin.y - cgRect.size.height))
+                                      .getSmallestIntegerContainer();
+}
+
+void CoreGraphicsContext::dispatchDrawGradient()
+{
+    jassert (state->fillType.isGradient());
+
+    // Core Graphics only supports the pad spread method.
+    if (state->fillType.gradient->spreadMethod == ColourGradient::SpreadMethod::pad)
+    {
+        drawGradient();
+        return;
+    }
+
+    const auto clip = convertToClipInt (CGContextGetClipBoundingBox (context.get()), flipHeight);
+    const auto gradientImage = state->fillType.getSoftwareGradientImage (clip);
+
+    drawImage (gradientImage,
+               AffineTransform::translation ((float) clip.getX(), (float) clip.getY()),
+               false);
+}
+
 void CoreGraphicsContext::drawGradient()
 {
     flip();
@@ -970,15 +995,29 @@ void CoreGraphicsContext::drawGradient()
     if (state->gradient == nullptr)
         state->gradient.reset (createGradient (g, rgbColourSpace.get()));
 
-    auto p1 = convertToCGPoint (g.point1);
-    auto p2 = convertToCGPoint (g.point2);
+    const auto p1 = convertToCGPoint (g.point1);
+    const auto p2 = convertToCGPoint (g.point2);
 
     if (g.isRadial)
-        CGContextDrawRadialGradient (context.get(), state->gradient.get(), p1, 0, p1, g.point1.getDistanceFrom (g.point2),
+    {
+        detail::RadialGradientView rg { state->fillType.gradient.get() };
+
+        CGContextDrawRadialGradient (context.get(),
+                                     state->gradient.get(),
+                                     convertToCGPoint (rg.getStartCircle().c),
+                                     rg.getStartCircle().r,
+                                     convertToCGPoint (rg.getEndCircle().c),
+                                     rg.getEndCircle().r,
                                      kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+    }
     else
-        CGContextDrawLinearGradient (context.get(), state->gradient.get(), p1, p2,
+    {
+        CGContextDrawLinearGradient (context.get(),
+                                     state->gradient.get(),
+                                     p1,
+                                     p2,
                                      kCGGradientDrawsBeforeStartLocation | kCGGradientDrawsAfterEndLocation);
+    }
 }
 
 void CoreGraphicsContext::createPath (const Path& path, const AffineTransform& transform) const

@@ -1652,16 +1652,23 @@ struct GLState
 
         auto t = transform.translated (0.5f - (float) target.bounds.getX(),
                                        0.5f - (float) target.bounds.getY());
-        auto p1 = g.point1.transformedBy (t);
-        auto p2 = g.point2.transformedBy (t);
-        auto p3 = Point<float> (g.point1.x + (g.point2.y - g.point1.y),
-                                g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t);
 
         auto programs = currentShader.programs;
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
 
         if (g.isRadial)
         {
+            detail::RadialGradientView gv { &g };
+
+            // This shader is only handling the simple radial case where the start and end circles
+            // are concentric.
+            const auto c1 = gv.getStartCircle().c;
+            const auto c2 = c1 + Point<float> { gv.getEndCircle().r, 0 };
+            const auto p1 = c1.transformedBy (t);
+            const auto p2 = c2.transformedBy (t);
+            const auto p3 = Point<float> (c1.x + (c2.y - c1.y),
+                                          c1.y - (c2.x - c1.x)).transformedBy (t);
+
             ShaderPrograms::RadialGradientParams* gradientParams;
 
             if (maskArea == nullptr)
@@ -1680,6 +1687,11 @@ struct GLState
         }
         else
         {
+            auto p1 = g.point1.transformedBy (t);
+            const auto p2 = g.point2.transformedBy (t);
+            const auto p3 = Point<float> (g.point1.x + (g.point2.y - g.point1.y),
+                                          g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t);
+
             p1 = Line<float> (p1, p3).findNearestPointTo (p2);
             const Point<float> delta (p2.x - p1.x, p1.y - p2.y);
             const ShaderPrograms::LinearGradientParams* gradientParams;
@@ -2126,6 +2138,22 @@ Result OpenGLGraphicsContextCustomShader::checkCompilation (LowLevelGraphicsCont
         return Result::ok();
 
     return Result::fail (errorMessage);
+}
+
+template <>
+void RenderingHelpers::SavedStateBase<juce::OpenGLRendering::SavedState>::dispatchFillAllWithGradient (typename BaseRegionType::Ptr shapeToFill)
+{
+    const auto& gradient = *fillType.gradient;
+
+    if ((gradient.isRadial && detail::TwoPointConicalGradient::create (gradient).has_value())
+        || gradient.spreadMethod != ColourGradient::SpreadMethod::pad)
+    {
+        const auto gradientImage = fillType.getSoftwareGradientImage (clip->getClipBounds());
+        renderImage (gradientImage, {}, shapeToFill.get());
+        return;
+    }
+
+    fillAllWithGradient (shapeToFill);
 }
 
 } // namespace juce
