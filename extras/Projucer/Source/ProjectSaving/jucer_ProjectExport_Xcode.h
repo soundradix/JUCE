@@ -2031,6 +2031,11 @@ public:
             // We'll need to add this strip step ourselves as a post build phase.
             s.set ("DEPLOYMENT_POSTPROCESSING", "NO");
 
+            // If we're stripping the binary we don't want to inject the base
+            // entitlements which might prevent notarisation.
+            if (config.isStripLocalSymbolsEnabled())
+                s.set ("CODE_SIGN_INJECT_BASE_ENTITLEMENTS", "NO");
+
             StringArray defsList;
 
             const auto defines = getConfigPreprocessorDefs (config);
