@@ -5490,6 +5490,7 @@ void HWNDComponentPeer::setCurrentRenderingEngine (int e)
         // can only be created once per window.
         renderContext.reset();
         renderContext = contextDescriptors[e].construct (*this);
+        InvalidateRect (hwnd, nullptr, TRUE);
     }
 }
 
