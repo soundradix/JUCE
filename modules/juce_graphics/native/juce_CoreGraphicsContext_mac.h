@@ -62,6 +62,7 @@ public:
     //==============================================================================
     void setFill (const FillType&) override;
     void setOpacity (float) override;
+    void setImageBlendMode (BlendMode) override;
     void setInterpolationQuality (Graphics::ResamplingQuality) override;
 
     //==============================================================================
@@ -98,6 +99,8 @@ public:
 
 private:
     //==============================================================================
+    BlendMode activateBlendMode (BlendMode mode);
+
     detail::ContextPtr context;
     const CGFloat flipHeight;
     detail::ColorSpacePtr rgbColourSpace, greyColourSpace;
@@ -107,10 +110,13 @@ private:
     std::unique_ptr<SavedState> state;
     OwnedArray<SavedState> stateStack;
 
+    BlendMode lastBlendMode = BlendMode::sourceOver;
+
     template <class RectType>
     CGRect convertToCGRectFlipped (RectType r) const noexcept;
     void setContextClipToCurrentPath (bool useNonZeroWinding);
     void drawCurrentPath (CGPathDrawingMode mode);
+    void dispatchDrawGradient();
     void drawGradient();
     void createPath (const Path&, const AffineTransform&) const;
     void flip() const;

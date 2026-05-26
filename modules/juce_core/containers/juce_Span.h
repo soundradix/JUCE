@@ -115,6 +115,7 @@ public:
     constexpr Span& operator= (Span&&) noexcept = default;
 
     using Base::size;
+    constexpr size_t getSizeInBytes() const { return size() * sizeof (Value); }
 
     constexpr Value* begin() const { return ptr; }
     constexpr Value* end()   const { return ptr + size(); }

@@ -76,6 +76,7 @@ public:
     //==============================================================================
     virtual void setFill (const FillType&) = 0;
     virtual void setOpacity (float) = 0;
+    virtual void setImageBlendMode (BlendMode) = 0;
     virtual void setInterpolationQuality (Graphics::ResamplingQuality) = 0;
 
     //==============================================================================

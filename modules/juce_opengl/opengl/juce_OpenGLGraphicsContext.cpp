@@ -1002,12 +1002,6 @@ struct StateHelpers
         }
 
         template <typename QuadQueueType>
-        void setPremultipliedBlendingMode (QuadQueueType& quadQueue) noexcept
-        {
-            setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-        }
-
-        template <typename QuadQueueType>
         void setBlendFunc (QuadQueueType& quadQueue, GLenum src, GLenum dst)
         {
             if (! blendingEnabled)
@@ -1038,12 +1032,29 @@ struct StateHelpers
         }
 
         template <typename QuadQueueType>
-        void setBlendMode (QuadQueueType& quadQueue, bool replaceExistingContents) noexcept
+        void setBlendMode (QuadQueueType& quadQueue, BlendMode mode) noexcept
         {
-            if (replaceExistingContents)
-                disableBlend (quadQueue);
-            else
-                setPremultipliedBlendingMode (quadQueue);
+            switch (mode)
+            {
+                case BlendMode::source:
+                    setBlendFunc (quadQueue, GL_ONE, GL_ZERO);
+                    return;
+
+                case BlendMode::sourceOver:
+                    setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+                    return;
+
+                case BlendMode::destinationIn:
+                    setBlendFunc (quadQueue, GL_ZERO, GL_SRC_ALPHA);
+                    return;
+
+                case BlendMode::destinationOut:
+                    setBlendFunc (quadQueue, GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
+                    return;
+            }
+
+            jassertfalse;
+            setBlendFunc (quadQueue, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
         }
 
     private:
@@ -1653,7 +1664,7 @@ struct GLState
                                    int maskTextureID, const Rectangle<int>* maskArea)
     {
         JUCE_CHECK_OPENGL_ERROR
-        blendMode.setPremultipliedBlendingMode (shaderQuadQueue);
+        blendMode.setBlendMode (shaderQuadQueue, BlendMode::sourceOver);
         JUCE_CHECK_OPENGL_ERROR
 
         if (maskArea != nullptr)
@@ -1672,16 +1683,23 @@ struct GLState
 
         auto t = transform.translated (0.5f - (float) target.bounds.getX(),
                                        0.5f - (float) target.bounds.getY());
-        auto p1 = g.point1.transformedBy (t);
-        auto p2 = g.point2.transformedBy (t);
-        auto p3 = Point<float> (g.point1.x + (g.point2.y - g.point1.y),
-                                g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t);
 
         auto programs = currentShader.programs;
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
 
         if (g.isRadial)
         {
+            detail::RadialGradientView gv { &g };
+
+            // This shader is only handling the simple radial case where the start and end circles
+            // are concentric.
+            const auto c1 = gv.getStartCircle().c;
+            const auto c2 = c1 + Point<float> { gv.getEndCircle().r, 0 };
+            const auto p1 = c1.transformedBy (t);
+            const auto p2 = c2.transformedBy (t);
+            const auto p3 = Point<float> (c1.x + (c2.y - c1.y),
+                                          c1.y - (c2.x - c1.x)).transformedBy (t);
+
             ShaderPrograms::RadialGradientParams* gradientParams;
 
             if (maskArea == nullptr)
@@ -1700,6 +1718,11 @@ struct GLState
         }
         else
         {
+            auto p1 = g.point1.transformedBy (t);
+            const auto p2 = g.point2.transformedBy (t);
+            const auto p3 = Point<float> (g.point1.x + (g.point2.y - g.point1.y),
+                                          g.point1.y - (g.point2.x - g.point1.x)).transformedBy (t);
+
             p1 = Line<float> (p1, p3).findNearestPointTo (p2);
             const Point<float> delta (p2.x - p1.x, p1.y - p2.y);
             const ShaderPrograms::LinearGradientParams* gradientParams;
@@ -1749,11 +1772,14 @@ struct GLState
         JUCE_CHECK_OPENGL_ERROR
     }
 
-    void setShaderForTiledImageFill (const TextureInfo& textureInfo, const AffineTransform& transform,
-                                     int maskTextureID, const Rectangle<int>* maskArea, bool isTiledFill)
+    void setShaderForTiledImageFill (const TextureInfo& textureInfo,
+                                     const AffineTransform& transform,
+                                     int maskTextureID,
+                                     const Rectangle<int>* maskArea,
+                                     bool isTiledFill,
+                                     BlendMode mode)
     {
-        blendMode.setPremultipliedBlendingMode (shaderQuadQueue);
-
+        blendMode.setBlendMode (shaderQuadQueue, mode);
         auto programs = currentShader.programs;
 
         const ShaderPrograms::MaskedShaderParams* maskParams = nullptr;
@@ -1885,7 +1911,13 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
                                  const AffineTransform& trans, Graphics::ResamplingQuality, bool tiledFill) const
     {
         state->shaderQuadQueue.flush();
-        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src), trans, 0, nullptr, tiledFill);
+
+        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src),
+                                           trans,
+                                           0,
+                                           nullptr,
+                                           tiledFill,
+                                           imageBlendMode);
 
         state->shaderQuadQueue.add (iter, PixelARGB ((uint8) alpha, (uint8) alpha, (uint8) alpha, (uint8) alpha));
         state->shaderQuadQueue.flush();
@@ -1906,7 +1938,12 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
         if (! isUsingCustomShader)
         {
             state->activeTextures.disableTextures (state->shaderQuadQueue);
-            state->blendMode.setBlendMode (state->shaderQuadQueue, replaceContents);
+
+            if (replaceContents)
+                state->blendMode.disableBlend (state->shaderQuadQueue);
+            else
+                state->blendMode.setBlendMode (state->shaderQuadQueue, imageBlendMode);
+
             state->setShader (state->currentShader.programs->solidColourProgram);
         }
 
@@ -2146,6 +2183,22 @@ Result OpenGLGraphicsContextCustomShader::checkCompilation (LowLevelGraphicsCont
         return Result::ok();
 
     return Result::fail (errorMessage);
+}
+
+template <>
+void RenderingHelpers::SavedStateBase<juce::OpenGLRendering::SavedState>::dispatchFillAllWithGradient (typename BaseRegionType::Ptr shapeToFill)
+{
+    const auto& gradient = *fillType.gradient;
+
+    if ((gradient.isRadial && detail::TwoPointConicalGradient::create (gradient).has_value())
+        || gradient.spreadMethod != ColourGradient::SpreadMethod::pad)
+    {
+        const auto gradientImage = fillType.getSoftwareGradientImage (clip->getClipBounds());
+        renderImage (gradientImage, {}, shapeToFill.get());
+        return;
+    }
+
+    fillAllWithGradient (shapeToFill);
 }
 
 } // namespace juce

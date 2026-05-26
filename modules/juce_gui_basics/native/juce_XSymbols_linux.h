@@ -202,6 +202,10 @@ public:
                                          (::Display*, Colormap),
                                          void)
 
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XFreeEventData, xFreeEventData,
+                                         (::Display*, XGenericEventCookie*),
+                                         void)
+
     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XFreeGC, xFreeGC,
                                          (::Display*, GC),
                                          void)
@@ -225,6 +229,10 @@ public:
     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XGetErrorText, xGetErrorText,
                                          (::Display*, int, const char*, int),
                                          void)
+
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XGetEventData, xGetEventData,
+                                         (::Display*, XGenericEventCookie*),
+                                         Bool)
 
     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XGetGeometry, xGetGeometry,
                                          (::Display*, ::Drawable, ::Window*, int*, int*, unsigned int*, unsigned int*, unsigned int*, unsigned int*),
@@ -293,6 +301,24 @@ public:
     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XInternAtom, xInternAtom,
                                          (::Display*, const char*, Bool),
                                          Atom)
+
+   #if JUCE_USE_XINPUT
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XIQueryVersion, xiQueryVersion,
+                                         (::Display*, int*, int*),
+                                         Status)
+
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XIQueryDevice, xiQueryDevice,
+                                         (::Display*, int, int*),
+                                         XIDeviceInfo*)
+
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XIFreeDeviceInfo, xiFreeDeviceInfo,
+                                         (XIDeviceInfo*),
+                                         void)
+
+    JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XISelectEvents, xiSelectEvents,
+                                         (::Display*, ::Window, XIEventMask*, int),
+                                         Status)
+   #endif
 
     JUCE_GENERATE_FUNCTION_WITH_DEFAULT (XkbKeycodeToKeysym, xkbKeycodeToKeysym,
                                          (::Display*, KeyCode, unsigned int, unsigned int),
@@ -608,6 +634,9 @@ private:
    #endif
    #if JUCE_USE_XRANDR
     DynamicLibrary xrandrLib   { "libXrandr.so.2" };
+   #endif
+   #if JUCE_USE_XINPUT
+    DynamicLibrary xinputLib   { "libXi.so" };
    #endif
 
     //==============================================================================

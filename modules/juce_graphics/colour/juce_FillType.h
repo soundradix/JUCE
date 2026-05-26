@@ -142,6 +142,12 @@ public:
     bool operator== (const FillType&) const;
     bool operator!= (const FillType&) const;
 
+    /** @internal
+
+        Returns an image that uses the software renderer to fill the clip region.
+    */
+    Image getSoftwareGradientImage (const Rectangle<int>& clip) const;
+
 private:
     JUCE_LEAK_DETECTOR (FillType)
 };

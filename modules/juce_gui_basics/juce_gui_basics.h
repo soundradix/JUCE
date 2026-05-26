@@ -106,6 +106,16 @@
  #define JUCE_USE_XCURSOR 1
 #endif
 
+/** Config: JUCE_USE_XINPUT
+    Uses XInput (v2.2+) to allow multitouch on Linux. This is best left turned on unless you
+    have a good reason to disable it.
+    The availability of XInput v2.2+ is queried at runtime so your users do not need to have
+    XInput installed for your JUCE app to run.
+*/
+#ifndef JUCE_USE_XINPUT
+ #define JUCE_USE_XINPUT 1
+#endif
+
 /** Config: JUCE_WIN_PER_MONITOR_DPI_AWARE
     Enables per-monitor DPI awareness on Windows 8.1 and above.
 */
@@ -365,6 +375,11 @@ namespace juce
   #if JUCE_USE_XCURSOR
    // If you're missing this header, you need to install the libxcursor-dev package
    #include <X11/Xcursor/Xcursor.h>
+  #endif
+
+  #if JUCE_USE_XINPUT
+   // If you're missing this header, you need to install the libxi-dev package
+   #include <X11/extensions/XInput2.h>
   #endif
 
   #undef SIZEOF

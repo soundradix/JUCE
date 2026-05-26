@@ -66,6 +66,7 @@ public:
     void beginTransparencyLayer (float opacity) override;
     void endTransparencyLayer() override;
     void setFill (const FillType& fillType) override;
+    void setImageBlendMode (BlendMode blendMode) override;
     void setOpacity (float newOpacity) override;
     void setInterpolationQuality (Graphics::ResamplingQuality quality) override;
     void fillRect (const Rectangle<int>& r, bool replace) override;

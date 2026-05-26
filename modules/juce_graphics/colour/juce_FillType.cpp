@@ -122,6 +122,17 @@ void FillType::setGradient (const ColourGradient& newGradient)
     }
 }
 
+Image FillType::getSoftwareGradientImage (const Rectangle<int>& clip) const
+{
+    jassert (isGradient());
+
+    Image result (Image::ARGB, clip.getWidth(), clip.getHeight(), true, SoftwareImageType{});
+    Graphics g (result);
+    g.setFillType (transformed (AffineTransform::translation ((float) -clip.getX(), (float) -clip.getY())));
+    g.fillAll();
+    return result;
+}
+
 void FillType::setTiledImage (const Image& newImage, const AffineTransform& newTransform) noexcept
 {
     gradient.reset();

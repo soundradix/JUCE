@@ -131,12 +131,14 @@ namespace juce
 #include "fonts/juce_GlyphArrangement.h"
 #include "fonts/juce_TextLayout.h"
 #include "contexts/juce_LowLevelGraphicsContext.h"
+#include "contexts/juce_ScopedBlendContext.h"
 #include "images/juce_ScaledImage.h"
 #include "contexts/juce_LowLevelGraphicsSoftwareRenderer.h"
 #include "effects/juce_ImageEffectFilter.h"
 #include "effects/juce_DropShadowEffect.h"
 #include "effects/juce_GlowEffect.h"
 #include "detail/juce_Unicode.h"
+#include "detail/juce_TwoPointConicalGradient.h"
 
 #if JUCE_GRAPHICS_INCLUDE_RENDERING_HELPERS
  #include "native/juce_RenderingHelpers.h"

@@ -30,7 +30,7 @@ public:
         // it's dangerous to create a window on a thread other than the message thread
         JUCE_ASSERT_MESSAGE_MANAGER_IS_LOCKED
 
-        const auto* instance = XWindowSystem::getInstance();
+        auto* instance = XWindowSystem::getInstance();
 
         if (! instance->isX11Available())
             return;
@@ -767,9 +767,12 @@ void Desktop::allowedOrientationsChanged()                          {}
 //==============================================================================
 bool detail::MouseInputSourceList::addSource()
 {
-    if (sources.isEmpty())
+    auto numSources = sources.size();
+
+    if (numSources == 0 || canUseTouch())
     {
-        addSource (0, MouseInputSource::InputSourceType::mouse);
+        addSource (numSources, numSources == 0 ? MouseInputSource::InputSourceType::mouse
+                                               : MouseInputSource::InputSourceType::touch);
         return true;
     }
 
@@ -778,7 +781,7 @@ bool detail::MouseInputSourceList::addSource()
 
 bool detail::MouseInputSourceList::canUseTouch() const
 {
-    return false;
+    return XWindowSystem::getInstance()->canUseMultiTouch();
 }
 
 Point<float> MouseInputSource::getCurrentRawMousePosition()

@@ -139,7 +139,7 @@
 #include "detail/juce_FocusRestorer.h"
 
 //==============================================================================
-#if JUCE_IOS || JUCE_WINDOWS
+#if JUCE_IOS || JUCE_WINDOWS || JUCE_LINUX
  #include "native/juce_MultiTouchMapper.h"
 #endif
 

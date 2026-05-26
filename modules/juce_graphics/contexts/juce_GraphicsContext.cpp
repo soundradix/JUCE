@@ -296,6 +296,12 @@ void Graphics::setOpacity (float newOpacity)
     context.setOpacity (newOpacity);
 }
 
+void Graphics::setImageBlendMode (BlendMode newMode)
+{
+    saveStateIfPending();
+    context.setImageBlendMode (newMode);
+}
+
 void Graphics::setGradientFill (const ColourGradient& gradient)
 {
     setFillType (gradient);
