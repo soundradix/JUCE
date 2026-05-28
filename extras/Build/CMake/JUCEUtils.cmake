@@ -261,12 +261,15 @@ endfunction()
 function(_juce_link_optional_libraries target)
     if((CMAKE_SYSTEM_NAME STREQUAL "Linux") OR (CMAKE_SYSTEM_NAME MATCHES ".*BSD"))
         get_target_property(needs_curl ${target} JUCE_NEEDS_CURL)
+        get_target_property(needs_browser ${target} JUCE_NEEDS_WEB_BROWSER)
+
+        target_compile_definitions(${target} PRIVATE
+            JUCE_USE_CURL=$<BOOL:${needs_curl}>
+            JUCE_WEB_BROWSER=$<BOOL:${needs_browser}>)
 
         if(needs_curl)
             target_link_libraries(${target} PRIVATE juce::pkgconfig_JUCE_CURL_LINUX_DEPS)
         endif()
-
-        get_target_property(needs_browser ${target} JUCE_NEEDS_WEB_BROWSER)
 
         if(needs_browser)
             target_link_libraries(${target} PRIVATE juce::pkgconfig_JUCE_BROWSER_LINUX_DEPS)
@@ -279,6 +282,9 @@ function(_juce_link_optional_libraries target)
         endif()
     elseif(APPLE)
         get_target_property(needs_storekit ${target} JUCE_NEEDS_STORE_KIT)
+
+        target_compile_definitions(${target} PRIVATE
+            JUCE_IN_APP_PURCHASES=$<BOOL:${needs_storekit}>)
 
         if(needs_storekit)
             _juce_link_frameworks("${target}" PRIVATE StoreKit)

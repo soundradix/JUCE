@@ -36,7 +36,7 @@ juce_add_gui_app(Projucer
     ICON_COMPOSER_BUNDLE                "${CMAKE_CURRENT_SOURCE_DIR}/Source/Assets/AppIcon.icon"
     DOCUMENT_EXTENSIONS                 jucer
     NEEDS_CURL                          TRUE
-    NEEDS_WEB_BROWSER                   TRUE)
+    NEEDS_WEB_BROWSER                   FALSE)
 
 juce_generate_juce_header(Projucer)
 

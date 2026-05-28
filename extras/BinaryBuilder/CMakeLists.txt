@@ -30,7 +30,8 @@
 #
 # ==============================================================================
 
-juce_add_console_app(BinaryBuilder)
+juce_add_console_app(BinaryBuilder
+    NEEDS_CURL FALSE)
 
 juce_generate_juce_header(BinaryBuilder)
 
