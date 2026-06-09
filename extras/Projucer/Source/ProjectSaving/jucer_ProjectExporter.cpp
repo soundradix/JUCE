@@ -218,7 +218,8 @@ ProjectExporter::ProjectExporter (Project& p, const ValueTree& state)
       extraPPDefsValue           (settings, Ids::extraDefs,                 getUndoManager()),
       paceProtectionValue        (settings, Ids::paceProtectionEnabled,     getUndoManager()),
       paceConfigurationFileValue (settings, Ids::paceConfigurationLocation, getUndoManager(), "pacefusion.toml"),
-      paceBuildSourceRootValue   (settings, Ids::paceBuildSourceRootFolder, getUndoManager(), ".")
+      paceBuildSourceRootValue   (settings, Ids::paceBuildSourceRootFolder, getUndoManager(), "."),
+      paceUseSharableTargetNames (settings, Ids::paceUsingSharableTargetNames,     getUndoManager())
 {
     projectCompilerFlagSchemesValue = project.getProjectValue (Ids::compilerFlagSchemes);
     projectCompilerFlagSchemesValue.addListener (this);
