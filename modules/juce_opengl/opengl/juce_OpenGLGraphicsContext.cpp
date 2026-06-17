@@ -728,7 +728,7 @@ struct ShaderPrograms final : public ReferenceCountedObject
         {
             setMatrix (
                 textureInfo.flipped
-                ? AffineTransform::translation (0, textureInfo.imageHeight).followedBy (trans)
+                ? AffineTransform::translation (0, (float) textureInfo.imageHeight).followedBy (trans)
                 : trans,
                 textureInfo.imageWidth,
                 textureInfo.flipped ? -textureInfo.imageHeight : textureInfo.imageHeight,
