@@ -827,6 +827,29 @@ private:
 
 class JuceVST3Component;
 
+//==============================================================================
+// Diagnostics for the Premiere/Audition VST3 editor re-open issue (POWAIR #75 / #11).
+// Off by default; define POWAIR_VST3_EDITOR_DIAGNOSTICS=1 (QA build) to trace the
+// createView/attached/createEditor/removed sequence to ~/POWAIR_VST3.log.
+#ifndef POWAIR_VST3_EDITOR_DIAGNOSTICS
+ #define POWAIR_VST3_EDITOR_DIAGNOSTICS 0
+#endif
+
+#if POWAIR_VST3_EDITOR_DIAGNOSTICS
+static void powairVST3Log (const String& message)
+{
+    static SpinLock lock;
+    const SpinLock::ScopedLockType sl (lock);
+
+    // Home dir: easy for QA to locate (~/POWAIR_VST3.log on macOS, C:\Users\<name>\POWAIR_VST3.log on Windows).
+    const auto logFile = File::getSpecialLocation (File::userHomeDirectory).getChildFile ("POWAIR_VST3.log");
+    logFile.appendText (Time::getCurrentTime().toString (true, true, true, true) + "  " + message + "\n");
+}
+ #define POWAIR_VST3_LOG(message) powairVST3Log (message)
+#else
+ #define POWAIR_VST3_LOG(message)
+#endif
+
 static thread_local bool inParameterChangedCallback = false;
 
 static void setValueAndNotifyIfChanged (AudioProcessorParameter& param, float newValue)
@@ -1518,15 +1541,39 @@ public:
     {
         if (auto* pluginInstance = getPluginInstance())
         {
+            const auto reusesActiveEditor = detail::PluginUtilities::getHostType().isAdobeAudition()
+                                         || detail::PluginUtilities::getHostType().isPremiere();
+
             const auto mayCreateEditor = pluginInstance->hasEditor()
                                       && name != nullptr
                                       && std::strcmp (name, Vst::ViewType::kEditor) == 0
                                       && (pluginInstance->getActiveEditor() == nullptr
-                                          || detail::PluginUtilities::getHostType().isAdobeAudition()
-                                          || detail::PluginUtilities::getHostType().isPremiere());
+                                          || reusesActiveEditor);
+
+            POWAIR_VST3_LOG ("createView: hasEditor=" + String ((int) pluginInstance->hasEditor())
+                             + " activeEditor=" + String::toHexString ((pointer_sized_int) pluginInstance->getActiveEditor())
+                             + " liveEditorView=" + String::toHexString ((pointer_sized_int) liveEditorView)
+                             + " mayCreate=" + String ((int) mayCreateEditor));
 
             if (mayCreateEditor)
-                return new JuceVST3Editor (*this, *audioProcessor);
+            {
+                // Premiere and Adobe Audition create a fresh editor view on re-open without
+                // first releasing (removed()) the previous one. Because an AudioProcessor has a
+                // single active-editor slot, the new view's createEditorAndMakeActive() would
+                // return nullptr while the stale view still holds it — leaving an editor-less
+                // ContentWrapperComponent that the host shows as a tiny black box (POWAIR #75 / #11).
+                // Release the stale view's editor first so the new view can take the slot.
+                if (reusesActiveEditor && liveEditorView != nullptr)
+                {
+                    POWAIR_VST3_LOG ("createView: releasing stale editor view "
+                                     + String::toHexString ((pointer_sized_int) liveEditorView));
+                    liveEditorView->releaseEditorContent();
+                }
+
+                auto* editorView = new JuceVST3Editor (*this, *audioProcessor);
+                liveEditorView = editorView;
+                return editorView;
+            }
         }
 
         return nullptr;
@@ -2032,7 +2079,11 @@ private:
            #endif
         }
 
-        ~JuceVST3Editor() override = default; // NOLINT
+        ~JuceVST3Editor() override
+        {
+            if (owner->liveEditorView == this)
+                owner->liveEditorView = nullptr;
+        }
 
         tresult PLUGIN_API queryInterface (const TUID targetIID, void** obj) override
         {
@@ -2071,6 +2122,9 @@ private:
 
         tresult PLUGIN_API attached (void* parent, FIDString type) override
         {
+            POWAIR_VST3_LOG ("attached: this=" + String::toHexString ((pointer_sized_int) this)
+                             + " parent=" + String::toHexString ((pointer_sized_int) parent));
+
             if (parent == nullptr || isPlatformTypeSupported (type) == kResultFalse)
                 return kResultFalse;
 
@@ -2102,6 +2156,8 @@ private:
 
         tresult PLUGIN_API removed() override
         {
+            POWAIR_VST3_LOG ("removed: this=" + String::toHexString ((pointer_sized_int) this));
+
             if (component != nullptr)
             {
                #if JUCE_WINDOWS
@@ -2118,9 +2174,35 @@ private:
                 lastReportedSize.reset();
             }
 
+            if (owner->liveEditorView == this)
+                owner->liveEditorView = nullptr;
+
             viewRunLoop.reset();
 
             return CPluginView::removed();
+        }
+
+        // Releases just the editor content (and its mac window attachment) without otherwise
+        // disturbing this view's host-facing attachment state. Used to free the AudioProcessor's
+        // single active-editor slot when Premiere/Audition open a new view over a stale one
+        // (see createView). Leaves an empty, reusable view object behind. (POWAIR #75 / #11)
+        void releaseEditorContent()
+        {
+            if (component == nullptr)
+                return;
+
+           #if JUCE_WINDOWS
+            component->removeFromDesktop();
+           #elif JUCE_MAC
+            if (macHostWindow != nullptr)
+            {
+                detail::VSTWindowUtilities::detachComponentFromWindowRefVST (component.get(), macHostWindow);
+                macHostWindow = nullptr;
+            }
+           #endif
+
+            component = nullptr;
+            lastReportedSize.reset();
         }
 
         tresult PLUGIN_API onSize (ViewRect* newSize) override
@@ -2166,7 +2248,13 @@ private:
            #endif
 
             if (size == nullptr || component == nullptr || component->pluginEditor == nullptr)
+            {
+                POWAIR_VST3_LOG ("getSize: returning kResultFalse (component="
+                                 + String::toHexString ((pointer_sized_int) component.get())
+                                 + " pluginEditor=" + String::toHexString ((pointer_sized_int) (component != nullptr ? component->pluginEditor.get() : nullptr))
+                                 + ") -> host falls back to tiny default window");
                 return kResultFalse;
+            }
 
             const auto editorBounds = component->getSizeToContainChild();
 
@@ -2389,6 +2477,10 @@ private:
             {
                 pluginEditor.reset (plugin.createEditorAndMakeActive());
 
+                POWAIR_VST3_LOG ("createEditor: pluginEditor="
+                                 + String::toHexString ((pointer_sized_int) pluginEditor.get())
+                                 + (pluginEditor == nullptr ? "  *** NULL EDITOR (black box) ***" : ""));
+
                #if JucePlugin_Enable_ARA
                 jassert (pluginEditor->getARAClientExtensions() != nullptr);
                 // for proper view embedding, ARA plug-ins must be resizable
@@ -2566,6 +2658,11 @@ private:
         //==============================================================================
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3Editor)
     };
+
+    // Non-owning pointer to the most-recently-created editor view. The host owns view lifetime
+    // (refcounted); JuceVST3Editor clears this on removed()/destruction. Used to release a stale
+    // view's editor when Premiere/Audition create a new view over the old one (see createView).
+    JuceVST3Editor* liveEditorView = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3EditController)
 
