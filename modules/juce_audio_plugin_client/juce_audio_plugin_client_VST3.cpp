@@ -1541,18 +1541,12 @@ public:
     {
         if (auto* pluginInstance = getPluginInstance())
         {
-            const auto& host = detail::PluginUtilities::getHostType();
-
-            // Premiere and Adobe Audition allow a second IPlugView to be created while an editor
-            // is still active (they re-open without first calling removed()). This allowance is
-            // inherited from upstream JUCE for both hosts.
-            const auto allowsConcurrentEditorView = host.isAdobeAudition() || host.isPremiere();
-
             const auto mayCreateEditor = pluginInstance->hasEditor()
                                       && name != nullptr
                                       && std::strcmp (name, Vst::ViewType::kEditor) == 0
                                       && (pluginInstance->getActiveEditor() == nullptr
-                                          || allowsConcurrentEditorView);
+                                          || detail::PluginUtilities::getHostType().isAdobeAudition()
+                                          || detail::PluginUtilities::getHostType().isPremiere());
 
             POWAIR_VST3_LOG ("createView: hasEditor=" + String ((int) pluginInstance->hasEditor())
                              + " activeEditor=" + String::toHexString ((pointer_sized_int) pluginInstance->getActiveEditor())
@@ -1573,10 +1567,13 @@ public:
                 // editor first so the new view can take the slot. We recreate rather than hand back the
                 // stale view: it is still attached to the old parent window and JUCE's attached() has
                 // no re-attach path, so reusing it would attach an already-attached component twice.
-                const auto isPremiere = host.isPremiere();
+                const auto isPremiere = detail::PluginUtilities::getHostType().isPremiere();
 
-                if (isPremiere && liveEditorView != nullptr)
+                // liveEditorView is only ever set for Premiere (below), so a non-null pointer here
+                // implies Premiere.
+                if (liveEditorView != nullptr)
                 {
+                    jassert (isPremiere);
                     POWAIR_VST3_LOG ("createView: releasing stale editor view "
                                      + String::toHexString ((pointer_sized_int) liveEditorView));
                     liveEditorView->releaseEditorContent();
