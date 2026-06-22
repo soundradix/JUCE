@@ -1541,14 +1541,18 @@ public:
     {
         if (auto* pluginInstance = getPluginInstance())
         {
-            const auto reusesActiveEditor = detail::PluginUtilities::getHostType().isAdobeAudition()
-                                         || detail::PluginUtilities::getHostType().isPremiere();
+            const auto& host = detail::PluginUtilities::getHostType();
+
+            // Premiere and Adobe Audition allow a second IPlugView to be created while an editor
+            // is still active (they re-open without first calling removed()). This allowance is
+            // inherited from upstream JUCE for both hosts.
+            const auto allowsConcurrentEditorView = host.isAdobeAudition() || host.isPremiere();
 
             const auto mayCreateEditor = pluginInstance->hasEditor()
                                       && name != nullptr
                                       && std::strcmp (name, Vst::ViewType::kEditor) == 0
                                       && (pluginInstance->getActiveEditor() == nullptr
-                                          || reusesActiveEditor);
+                                          || allowsConcurrentEditorView);
 
             POWAIR_VST3_LOG ("createView: hasEditor=" + String ((int) pluginInstance->hasEditor())
                              + " activeEditor=" + String::toHexString ((pointer_sized_int) pluginInstance->getActiveEditor())
@@ -1557,13 +1561,16 @@ public:
 
             if (mayCreateEditor)
             {
-                // Premiere and Adobe Audition create a fresh editor view on re-open without
-                // first releasing (removed()) the previous one. Because an AudioProcessor has a
-                // single active-editor slot, the new view's createEditorAndMakeActive() would
-                // return nullptr while the stale view still holds it — leaving an editor-less
-                // ContentWrapperComponent that the host shows as a tiny black box (POWAIR #75 / #11).
-                // Release the stale view's editor first so the new view can take the slot.
-                if (reusesActiveEditor && liveEditorView != nullptr)
+                // The black-box-on-reopen bug (POWAIR #75 / #11) was QA-confirmed in Premiere only.
+                // There the host leaks the prior view (never calls removed()), so its editor still
+                // squats the AudioProcessor's single active-editor slot — the new view's
+                // createEditorAndMakeActive() returns nullptr, leaving an editor-less
+                // ContentWrapperComponent the host shows as a tiny black box. Release the stale
+                // view's editor first so the new view can take the slot. We recreate rather than
+                // hand back the stale view: it is still attached to the old parent window and
+                // JUCE's attached() has no re-attach path, so reusing it would attach an
+                // already-attached component to a second window.
+                if (host.isPremiere() && liveEditorView != nullptr)
                 {
                     POWAIR_VST3_LOG ("createView: releasing stale editor view "
                                      + String::toHexString ((pointer_sized_int) liveEditorView));
