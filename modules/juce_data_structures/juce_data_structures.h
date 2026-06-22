@@ -44,7 +44,7 @@
 
   ID:                 juce_data_structures
   vendor:             juce
-  version:            8.0.13
+  version:            8.0.14
   name:               JUCE data model helper classes
   description:        Classes for undo/redo management, and smart data structures.
   website:            http://www.juce.com/juce
