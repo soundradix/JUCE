@@ -827,29 +827,6 @@ private:
 
 class JuceVST3Component;
 
-//==============================================================================
-// Diagnostics for the Premiere VST3 editor re-open issue (POWAIR #75 / #11).
-// Off by default; define POWAIR_VST3_EDITOR_DIAGNOSTICS=1 (QA build) to trace the
-// createView/attached/createEditor/removed sequence to ~/POWAIR_VST3.log.
-#ifndef POWAIR_VST3_EDITOR_DIAGNOSTICS
- #define POWAIR_VST3_EDITOR_DIAGNOSTICS 0
-#endif
-
-#if POWAIR_VST3_EDITOR_DIAGNOSTICS
-static void powairVST3Log (const String& message)
-{
-    static SpinLock lock;
-    const SpinLock::ScopedLockType sl (lock);
-
-    // Home dir: easy for QA to locate (~/POWAIR_VST3.log on macOS, C:\Users\<name>\POWAIR_VST3.log on Windows).
-    const auto logFile = File::getSpecialLocation (File::userHomeDirectory).getChildFile ("POWAIR_VST3.log");
-    logFile.appendText (Time::getCurrentTime().toString (true, true, true, true) + "  " + message + "\n");
-}
- #define POWAIR_VST3_LOG(message) powairVST3Log (message)
-#else
- #define POWAIR_VST3_LOG(message)
-#endif
-
 static thread_local bool inParameterChangedCallback = false;
 
 static void setValueAndNotifyIfChanged (AudioProcessorParameter& param, float newValue)
@@ -1548,11 +1525,6 @@ public:
                                           || detail::PluginUtilities::getHostType().isAdobeAudition()
                                           || detail::PluginUtilities::getHostType().isPremiere());
 
-            POWAIR_VST3_LOG ("createView: hasEditor=" + String ((int) pluginInstance->hasEditor())
-                             + " activeEditor=" + String::toHexString ((pointer_sized_int) pluginInstance->getActiveEditor())
-                             + " liveEditorView=" + String::toHexString ((pointer_sized_int) liveEditorView)
-                             + " mayCreate=" + String ((int) mayCreateEditor));
-
             if (mayCreateEditor)
             {
                 // liveEditorView and the stale-view release below are a Premiere-only mechanism.
@@ -1574,8 +1546,6 @@ public:
                 if (liveEditorView != nullptr)
                 {
                     jassert (isPremiere);
-                    POWAIR_VST3_LOG ("createView: releasing stale editor view "
-                                     + String::toHexString ((pointer_sized_int) liveEditorView));
                     liveEditorView->releaseEditorContent();
                 }
 
@@ -2134,9 +2104,6 @@ private:
 
         tresult PLUGIN_API attached (void* parent, FIDString type) override
         {
-            POWAIR_VST3_LOG ("attached: this=" + String::toHexString ((pointer_sized_int) this)
-                             + " parent=" + String::toHexString ((pointer_sized_int) parent));
-
             if (parent == nullptr || isPlatformTypeSupported (type) == kResultFalse)
                 return kResultFalse;
 
@@ -2168,8 +2135,6 @@ private:
 
         tresult PLUGIN_API removed() override
         {
-            POWAIR_VST3_LOG ("removed: this=" + String::toHexString ((pointer_sized_int) this));
-
             if (component != nullptr)
             {
                #if JUCE_WINDOWS
@@ -2260,13 +2225,7 @@ private:
            #endif
 
             if (size == nullptr || component == nullptr || component->pluginEditor == nullptr)
-            {
-                POWAIR_VST3_LOG ("getSize: returning kResultFalse (component="
-                                 + String::toHexString ((pointer_sized_int) component.get())
-                                 + " pluginEditor=" + String::toHexString ((pointer_sized_int) (component != nullptr ? component->pluginEditor.get() : nullptr))
-                                 + ") -> host falls back to tiny default window");
                 return kResultFalse;
-            }
 
             const auto editorBounds = component->getSizeToContainChild();
 
@@ -2488,10 +2447,6 @@ private:
             void createEditor (AudioProcessor& plugin)
             {
                 pluginEditor.reset (plugin.createEditorAndMakeActive());
-
-                POWAIR_VST3_LOG ("createEditor: pluginEditor="
-                                 + String::toHexString ((pointer_sized_int) pluginEditor.get())
-                                 + (pluginEditor == nullptr ? "  *** NULL EDITOR (black box) ***" : ""));
 
                #if JucePlugin_Enable_ARA
                 jassert (pluginEditor->getARAClientExtensions() != nullptr);
