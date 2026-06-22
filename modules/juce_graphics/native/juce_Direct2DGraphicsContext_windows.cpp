@@ -639,9 +639,13 @@ void Direct2DGraphicsContext::restoreState()
 
     currentState = getPimpl()->popSavedState();
 
-    currentState->updateColourBrush();
-    jassert (currentState);
+    if (currentState == nullptr)
+    {
+        jassertfalse;
+        return;
+    }
 
+    currentState->updateColourBrush();
     resetPendingClipList();
 }
 

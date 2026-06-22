@@ -3,6 +3,13 @@
 This file lists the more notable headline features. For more detailed info
 about changes and bugfixes please see the git log and BREAKING_CHANGES.md.
 
+## Version 8.0.14
+
+  - Reduced the build tree depth to avoid Windows limits
+  - Fixed some MIDI issues
+  - Fixed some Projucer macOS code signing issues
+  - Fixed an iOS sample rate testing issue
+
 ## Version 8.0.13
 
   - Improved the compile time of the juce_gui_basics module

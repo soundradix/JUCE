@@ -30,14 +30,17 @@
 #
 # ==============================================================================
 
-juce_add_gui_app(NetworkGraphicsDemo)
+juce_add_gui_app(NetworkGraphicsDemo
+    NEEDS_WEB_BROWSER FALSE
+    NEEDS_CURL FALSE)
 
 juce_generate_juce_header(NetworkGraphicsDemo)
 
 target_sources(NetworkGraphicsDemo PRIVATE Source/Main.cpp)
 
 target_compile_definitions(NetworkGraphicsDemo PRIVATE
-    JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+    JUCE_USE_CURL=0
+    JUCE_WEB_BROWSER=0)
 
 target_link_libraries(NetworkGraphicsDemo PRIVATE
     juce::juce_audio_utils

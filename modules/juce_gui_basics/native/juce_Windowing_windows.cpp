@@ -571,7 +571,7 @@ RTL_OSVERSIONINFOW getWindowsVersionInfo();
 
 double Desktop::getDefaultMasterScale()
 {
-    if (isPerMonitorDPIAwareProcess())
+    if (setDPIAwareness())
         return 1.0;
 
     return getGlobalDPI() / USER_DEFAULT_SCREEN_DPI;
