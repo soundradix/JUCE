@@ -1561,16 +1561,21 @@ public:
 
             if (mayCreateEditor)
             {
-                // The black-box-on-reopen bug (POWAIR #75 / #11) was QA-confirmed in Premiere only.
-                // There the host leaks the prior view (never calls removed()), so its editor still
-                // squats the AudioProcessor's single active-editor slot — the new view's
+                // liveEditorView and the stale-view release below are a Premiere-only mechanism.
+                // For every other host this block is just `return new JuceVST3Editor (...)`, exactly
+                // as before — liveEditorView is never set, so the release path can never run.
+                //
+                // The black-box-on-reopen bug (POWAIR #75 / #11) was QA-confirmed in Premiere only:
+                // it leaks the prior view (never calls removed()), so that view's editor still squats
+                // the AudioProcessor's single active-editor slot — the new view's
                 // createEditorAndMakeActive() returns nullptr, leaving an editor-less
-                // ContentWrapperComponent the host shows as a tiny black box. Release the stale
-                // view's editor first so the new view can take the slot. We recreate rather than
-                // hand back the stale view: it is still attached to the old parent window and
-                // JUCE's attached() has no re-attach path, so reusing it would attach an
-                // already-attached component to a second window.
-                if (host.isPremiere() && liveEditorView != nullptr)
+                // ContentWrapperComponent the host shows as a tiny black box. Release the stale view's
+                // editor first so the new view can take the slot. We recreate rather than hand back the
+                // stale view: it is still attached to the old parent window and JUCE's attached() has
+                // no re-attach path, so reusing it would attach an already-attached component twice.
+                const auto isPremiere = host.isPremiere();
+
+                if (isPremiere && liveEditorView != nullptr)
                 {
                     POWAIR_VST3_LOG ("createView: releasing stale editor view "
                                      + String::toHexString ((pointer_sized_int) liveEditorView));
@@ -1578,7 +1583,10 @@ public:
                 }
 
                 auto* editorView = new JuceVST3Editor (*this, *audioProcessor);
-                liveEditorView = editorView;
+
+                if (isPremiere)
+                    liveEditorView = editorView;
+
                 return editorView;
             }
         }
@@ -2666,9 +2674,10 @@ private:
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3Editor)
     };
 
-    // Non-owning pointer to the most-recently-created editor view. The host owns view lifetime
-    // (refcounted); JuceVST3Editor clears this on removed()/destruction. Used to release a stale
-    // view's editor when Premiere/Audition create a new view over the old one (see createView).
+    // Non-owning pointer to the most-recently-created editor view. Premiere-only: it is set only
+    // when the host is Premiere (left null for every other host), and the owning JuceVST3Editor
+    // clears it on removed()/destruction. Used to release a stale view's editor when Premiere
+    // creates a new view over the old one without releasing it (see createView).
     JuceVST3Editor* liveEditorView = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3EditController)
