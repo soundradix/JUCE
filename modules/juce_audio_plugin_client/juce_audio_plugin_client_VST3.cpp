@@ -828,7 +828,7 @@ private:
 class JuceVST3Component;
 
 //==============================================================================
-// Diagnostics for the Premiere/Audition VST3 editor re-open issue (POWAIR #75 / #11).
+// Diagnostics for the Premiere VST3 editor re-open issue (POWAIR #75 / #11).
 // Off by default; define POWAIR_VST3_EDITOR_DIAGNOSTICS=1 (QA build) to trace the
 // createView/attached/createEditor/removed sequence to ~/POWAIR_VST3.log.
 #ifndef POWAIR_VST3_EDITOR_DIAGNOSTICS
@@ -2196,7 +2196,7 @@ private:
 
         // Releases just the editor content (and its mac window attachment) without otherwise
         // disturbing this view's host-facing attachment state. Used to free the AudioProcessor's
-        // single active-editor slot when Premiere/Audition open a new view over a stale one
+        // single active-editor slot when Premiere opens a new view over a stale one
         // (see createView). Leaves an empty, reusable view object behind. (POWAIR #75 / #11)
         void releaseEditorContent()
         {
