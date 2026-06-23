@@ -47,16 +47,14 @@ Uuid::Uuid()
     uuid[8] = (uuid[8] & 0x3f) | 0x80;
 }
 
-Uuid::~Uuid() noexcept {}
-
 Uuid::Uuid (const Uuid& other) noexcept
 {
-    memcpy (uuid, other.uuid, sizeof (uuid));
+    std::copy (other.uuid, other.uuid + sizeInBytes, uuid);
 }
 
 Uuid& Uuid::operator= (const Uuid& other) noexcept
 {
-    memcpy (uuid, other.uuid, sizeof (uuid));
+    Uuid { other }.swap (*this);
     return *this;
 }
 
@@ -112,15 +110,15 @@ String Uuid::toDashedString() const
 
 Uuid::Uuid (const String& uuidString)
 {
-    operator= (uuidString);
-}
-
-Uuid& Uuid::operator= (const String& uuidString)
-{
     MemoryBlock mb;
     mb.loadFromHexString (uuidString);
     mb.ensureSize (sizeof (uuid), true);
     mb.copyTo (uuid, 0, sizeof (uuid));
+}
+
+Uuid& Uuid::operator= (const String& uuidString)
+{
+    Uuid { uuidString }.swap (*this);
     return *this;
 }
 
@@ -154,6 +152,14 @@ uint64 Uuid::hash() const noexcept
         result = ((uint64) 101) * result + n;
 
     return result;
+}
+
+void Uuid::swap (Uuid& other) noexcept
+{
+    uint8 temp[sizeInBytes];
+    std::copy (uuid, uuid + sizeInBytes, temp);
+    std::copy (other.uuid, other.uuid + sizeInBytes, uuid);
+    std::copy (temp, temp + sizeInBytes, other.uuid);
 }
 
 } // namespace juce
