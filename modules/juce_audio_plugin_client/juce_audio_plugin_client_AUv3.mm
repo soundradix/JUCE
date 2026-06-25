@@ -1535,7 +1535,12 @@ private:
                                       AURenderPullInputBlock __nullable pullInputBlock)
     {
         auto& processor = getAudioProcessor();
-        jassert (static_cast<int> (frameCount) <= getAudioProcessor().getBlockSize());
+
+        if ((int) frameCount > getAudioProcessor().getBlockSize())
+        {
+            jassertfalse;
+            return kAudioUnitErr_TooManyFramesToProcess;
+        }
 
         const auto numProcessorBusesOut = AudioUnitHelpers::getBusCount (processor, false);
 
