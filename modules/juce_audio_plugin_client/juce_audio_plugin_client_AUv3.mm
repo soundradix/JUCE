@@ -1557,9 +1557,15 @@ private:
             {
                 for (int busIdx = 0; busIdx < numWrapperBusesOut; ++busIdx)
                 {
-                     BusBuffer& busBuffer = *outBusBuffers[busIdx];
-                     const bool canUseDirectOutput =
-                         (busIdx == outputBusNumber && outputData != nullptr && outputData->mNumberBuffers > 0);
+                    BusBuffer& busBuffer = *outBusBuffers[busIdx];
+
+                    // auval can pass outputData with null data pointers, despite having non-zero mDataByteSize.
+                    const auto canUseDirectOutput = busIdx == outputBusNumber
+                                                 && outputData != nullptr
+                                                 && outputData->mNumberBuffers > 0
+                                                 && std::none_of (outputData->mBuffers,
+                                                                  outputData->mBuffers + outputData->mNumberBuffers,
+                                                                  [] (auto& buffer) { return buffer.mData == nullptr; });
 
                     busBuffer.prepare (frameCount, canUseDirectOutput ? outputData : nullptr);
 
