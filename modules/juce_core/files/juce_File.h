@@ -991,7 +991,10 @@ public:
         globalApplicationsDirectoryX86,
 
         /** On a Windows machine returns the %LOCALAPPDATA% folder. */
-        windowsLocalAppData
+        windowsLocalAppData,
+
+        /** On a Windows machine returns the %COMMONPROGRAMFILES% folder. */
+        windowsProgramFilesCommon,
        #endif
     };
 
