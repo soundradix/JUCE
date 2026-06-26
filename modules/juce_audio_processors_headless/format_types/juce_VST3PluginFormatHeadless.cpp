@@ -150,9 +150,9 @@ FileSearchPath VST3PluginFormatHeadless::getDefaultLocationsToSearch()
     auto defaults = std::invoke ([]() -> FileSearchPath
     {
       #if JUCE_WINDOWS
-        const auto localAppData = File::getSpecialLocation (File::windowsLocalAppData)        .getFullPathName();
-        const auto programFiles = File::getSpecialLocation (File::globalApplicationsDirectory).getFullPathName();
-        return { localAppData + "\\Programs\\Common\\VST3;" + programFiles + "\\Common Files\\VST3" };
+        const auto localAppData = File::getSpecialLocation (File::windowsLocalAppData).getFullPathName();
+        const auto programFiles = File::getSpecialLocation (File::windowsProgramFilesCommon).getFullPathName();
+        return { localAppData + "\\Programs\\Common\\VST3;" + programFiles + "\\VST3" };
       #elif JUCE_MAC
         return { "~/Library/Audio/Plug-Ins/VST3;/Library/Audio/Plug-Ins/VST3" };
       #else
