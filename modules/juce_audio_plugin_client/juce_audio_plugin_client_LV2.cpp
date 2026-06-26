@@ -1232,11 +1232,7 @@ private:
         const auto microVersion = getVersionOrZero (1);
 
         os << "\ta "
-             #if JucePlugin_IsSynth
-              "lv2:InstrumentPlugin"
-             #else
-              "lv2:Plugin"
-             #endif
+              "lv2:" JUCE_STRINGIFY (JucePlugin_LV2PluginClass)
               " ;\n"
               "\tdoap:name \"" JucePlugin_Name "\" ;\n"
               "\tdoap:description \"" JucePlugin_Desc "\" ;\n"

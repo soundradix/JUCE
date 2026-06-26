@@ -1606,6 +1606,7 @@ function(_juce_configure_plugin_targets target)
         JucePlugin_VersionCode=${project_version_hex}
         JucePlugin_VSTUniqueID=JucePlugin_PluginCode
         JucePlugin_VSTCategory=$<TARGET_PROPERTY:${target},JUCE_VST2_CATEGORY>
+        JucePlugin_LV2PluginClass=$<TARGET_PROPERTY:${target},JUCE_LV2_PLUGIN_CLASS>
         JucePlugin_Vst3Category="${vst3_category_string}"
         JucePlugin_AUMainType=$<TARGET_PROPERTY:${target},JUCE_AU_MAIN_TYPE_CODE>
         JucePlugin_AUSubType=JucePlugin_PluginCode
@@ -1848,6 +1849,13 @@ function(_juce_set_fallback_properties target)
         _juce_set_property_if_not_set(${target} VST2_CATEGORY kPlugCategEffect)
     endif()
 
+    # LV2 Plugin Class
+    if(is_synth)
+        _juce_set_property_if_not_set(${target} LV2_PLUGIN_CLASS InstrumentPlugin)
+    endif()
+
+    _juce_set_property_if_not_set(${target} LV2_PLUGIN_CLASS Plugin)
+
     get_target_property(is_midi_effect ${target} JUCE_IS_MIDI_EFFECT)
     get_target_property(needs_midi_input ${target} JUCE_NEEDS_MIDI_INPUT)
 
@@ -2070,6 +2078,7 @@ function(_juce_initialise_target target)
         VST_NUM_MIDI_INS
         VST_NUM_MIDI_OUTS
         VST2_CATEGORY
+        LV2_PLUGIN_CLASS
         AU_MAIN_TYPE
         AU_EXPORT_PREFIX
         AU_SANDBOX_SAFE
