@@ -938,7 +938,7 @@ private:
     }
 
     //==============================================================================
-    static InAppPurchases::Purchase buildPurchase (LocalRef<jobject> purchase)
+    static Purchase buildPurchase (LocalRef<jobject> purchase)
     {
         if (purchase == nullptr)
             return {};
@@ -951,7 +951,7 @@ private:
         return { juceString (LocalRef<jstring> { (jstring) env->CallObjectMethod (purchase, AndroidPurchase.getOrderId) }),
                  javaListOfStringToJuceStringArray (LocalRef<jobject> { env->CallObjectMethod (purchase, AndroidPurchase.getProducts) }),
                  juceString (LocalRef<jstring> { (jstring) env->CallObjectMethod (purchase, AndroidPurchase.getPackageName) }),
-                 Time (env->CallLongMethod (purchase, AndroidPurchase.getPurchaseTime)).toString (true, true, true, true),
+                 Time (env->CallLongMethod (purchase, AndroidPurchase.getPurchaseTime)),
                  juceString (LocalRef<jstring> { (jstring) env->CallObjectMethod (purchase, AndroidPurchase.getPurchaseToken) }) };
     }
 
