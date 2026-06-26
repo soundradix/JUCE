@@ -59,12 +59,14 @@ struct InAppPurchases::Pimpl
       #if JUCE_IOS
         int64 getContentLength()   const override  { return download.contentLength; }
       #else
-        int64 getContentLength()   const override
+        int64 getContentLength() const override
         {
             if (@available (macOS 10.15, *))
                 return download.expectedContentLength;
 
+            JUCE_BEGIN_IGNORE_DEPRECATION_WARNINGS
             return download.contentLength.longLongValue;
+            JUCE_END_IGNORE_DEPRECATION_WARNINGS
         }
       #endif
 
