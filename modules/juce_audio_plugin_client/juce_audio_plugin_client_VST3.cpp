@@ -2996,7 +2996,7 @@ public:
     Optional<PositionInfo> getPosition() const override
     {
         PositionInfo info;
-        info.setTimeInSamples (jmax ((Steinberg::int64) 0, processContext.projectTimeSamples));
+        info.setTimeInSamples (processContext.projectTimeSamples);
         info.setTimeInSeconds (static_cast<double> (*info.getTimeInSamples()) / processContext.sampleRate);
         info.setIsRecording ((processContext.state & Vst::ProcessContext::kRecording) != 0);
         info.setIsPlaying ((processContext.state & Vst::ProcessContext::kPlaying) != 0);
