@@ -35,6 +35,32 @@
 namespace juce
 {
 
+static bool tryAllocTexture (int w, int h, GLenum type)
+{
+    JUCE_CHECK_OPENGL_ERROR
+
+    for (const auto& [testWidth, testHeight] : { std::tuple (w, h),
+                                                 std::tuple (nextPowerOfTwo (w), nextPowerOfTwo (h)) })
+    {
+        glTexImage2D (GL_TEXTURE_2D,
+                      0,
+                      type == GL_ALPHA ? GL_ALPHA : GL_RGBA,
+                      testWidth,
+                      testHeight,
+                      0,
+                      type,
+                      GL_UNSIGNED_BYTE,
+                      nullptr);
+
+        const GLenum error = glGetError();
+
+        if (error == GL_NO_ERROR)
+            return true;
+    }
+
+    return false;
+}
+
 /*
     Used on Android to detect when the GL context and associated resources (textures, framebuffers,
     etc.) need to be destroyed/created due to the Surface changing state.
@@ -357,7 +383,10 @@ private:
                 glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
                 JUCE_CHECK_OPENGL_ERROR
 
-                glTexImage2D (GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+                [[maybe_unused]] const auto created = tryAllocTexture (width, height, GL_RGBA);
+                // Failed to create texture
+                jassert (created);
+
                 JUCE_CHECK_OPENGL_ERROR
             }
 
