@@ -39,20 +39,31 @@ bool HiddenMessageWindow::setDPIAwareness()
 {
     static const auto didSetDpiAwareness = std::invoke ([]
     {
-        constexpr auto shcore = "SHCore.dll";
-        LoadLibraryA (shcore);
+        for (auto* moduleName : { "SHCore.dll", "User32.dll" })
+        {
+            LoadLibraryA (moduleName);
+            const auto module = GetModuleHandleA (moduleName);
 
-        const auto shcoreModule = GetModuleHandleA (shcore);
+            if (module == nullptr)
+                continue;
 
-        if (shcoreModule == nullptr)
-            return false;
+            using SetProcessDpiAwarenessContextFunc = BOOL (WINAPI*) (DPI_AWARENESS_CONTEXT);
 
-        using SetProcessDpiAwarenessContextFunc = BOOL (WINAPI*) (DPI_AWARENESS_CONTEXT);
-        const auto setProcessDpiAwarenessContext = (SetProcessDpiAwarenessContextFunc) GetProcAddress (shcoreModule, "SetProcessDpiAwarenessContext");
+            const auto setProcessDpiAwarenessContext = (SetProcessDpiAwarenessContextFunc) GetProcAddress (module, "SetProcessDpiAwarenessContext");
 
-        if (setProcessDpiAwarenessContext != nullptr
-            && setProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
-            return true;
+            if (setProcessDpiAwarenessContext == nullptr)
+                continue;
+
+            if (setProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
+                return true;
+
+            const auto error = GetLastError();
+
+            if (error == ERROR_ACCESS_DENIED)
+                return false;
+
+            break;
+        }
 
         if (SUCCEEDED (SetProcessDpiAwareness (PROCESS_PER_MONITOR_DPI_AWARE)))
             return true;
