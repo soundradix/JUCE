@@ -350,7 +350,6 @@ public:
             info->setTimeSignature (TimeSignature { (int) *numerator, (int) *denominator });
 
         info->setBpm (parser.parseNumericAtom<float> (atomBeatsPerMinute));
-        info->setPpqPosition (parser.parseNumericAtom<double> (atomBeat));
         info->setIsPlaying (! approximatelyEqual (parser.parseNumericAtom<float> (atomSpeed).value_or (0.0f), 0.0f));
         info->setBarCount (parser.parseNumericAtom<int64_t> (atomBar));
 
