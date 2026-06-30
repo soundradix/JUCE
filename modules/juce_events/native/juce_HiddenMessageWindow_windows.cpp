@@ -39,6 +39,42 @@ bool HiddenMessageWindow::setDPIAwareness()
 {
     static const auto didSetDpiAwareness = std::invoke ([]
     {
+        // The docs for SetProcessDpiAwarenessContext specify that the call will fail if the DPI
+        // context has already been set. Separately, the documentation page "Setting the default DPI
+        // awareness for a process" [1] says that "Once a window (an HWND) has been created in your
+        // process, changing the DPI awareness mode is no longer supported".
+        // This is the behaviour we want; unfortunately, we see that SetProcessDpiAwarenessContext
+        // may change the dpi awareness mode and return true, even after the process has created a
+        // window, at least on Windows 11 25H2.
+        // As a workaround, we only attempt to set a new dpi awareness mode if the process does not
+        // have any windows in existence. The assumption here is that applications are written
+        // according to the _documented_ behaviour, and therefore are guaranteed to have set the
+        // desired process dpi awareness mode before any window is created.
+        //
+        // [1]: https://learn.microsoft.com/en-us/windows/win32/hidpi/setting-the-default-dpi-awareness-for-a-process
+
+        const WNDENUMPROC callback = [] (HWND h, LPARAM ptr) -> BOOL
+        {
+            DWORD procOut{};
+            GetWindowThreadProcessId (h, &procOut);
+
+            if (procOut != GetCurrentProcessId())
+            {
+                return TRUE;
+            }
+
+            *reinterpret_cast<int*> (ptr) += 1;
+            // We just want to know if at least one window exists.
+            // Short-circuit so we don't unnecessarily visit every window.
+            return FALSE;
+        };
+
+        int counter = 0;
+        EnumWindows (callback, reinterpret_cast<LPARAM> (&counter));
+
+        if (counter != 0)
+            return false;
+
         for (auto* moduleName : { "SHCore.dll", "User32.dll" })
         {
             LoadLibraryA (moduleName);
