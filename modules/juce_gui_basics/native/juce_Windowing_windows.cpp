@@ -334,43 +334,12 @@ static void checkForPointerAPI()
 }
 
 //==============================================================================
-static bool setDPIAwareness()
-{
-    static const auto didSetDpiAwareness = std::invoke ([]
-    {
-        constexpr auto shcore = "SHCore.dll";
-        LoadLibraryA (shcore);
-
-        const auto shcoreModule = GetModuleHandleA (shcore);
-
-        if (shcoreModule == nullptr)
-            return false;
-
-        using SetProcessDpiAwarenessContextFunc = BOOL (WINAPI*) (DPI_AWARENESS_CONTEXT);
-        const auto setProcessDpiAwarenessContext = (SetProcessDpiAwarenessContextFunc) GetProcAddress (shcoreModule, "SetProcessDpiAwarenessContext");
-
-        if (setProcessDpiAwarenessContext != nullptr
-            && setProcessDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2))
-            return true;
-
-        if (SUCCEEDED (SetProcessDpiAwareness (PROCESS_PER_MONITOR_DPI_AWARE)))
-            return true;
-
-        if (SUCCEEDED (SetProcessDpiAwareness (PROCESS_SYSTEM_DPI_AWARE)))
-            return true;
-
-        return SetProcessDPIAware() != 0;
-    });
-
-    return didSetDpiAwareness;
-}
-
 static inline bool isPerMonitorDPIAwareWindow ([[maybe_unused]] HWND nativeWindow)
 {
    #if ! JUCE_WIN_PER_MONITOR_DPI_AWARE
     return false;
    #else
-    setDPIAwareness();
+    HiddenMessageWindow::setDPIAwareness();
 
     return (GetAwarenessFromDpiAwarenessContext (GetWindowDpiAwarenessContext (nativeWindow))
               == DPI_AWARENESS_PER_MONITOR_AWARE);
@@ -382,7 +351,7 @@ static bool isPerMonitorDPIAwareThread()
    #if ! JUCE_WIN_PER_MONITOR_DPI_AWARE
     return false;
    #else
-    setDPIAwareness();
+    HiddenMessageWindow::setDPIAwareness();
 
     return (GetAwarenessFromDpiAwarenessContext (GetThreadDpiAwarenessContext())
               == DPI_AWARENESS_PER_MONITOR_AWARE);
@@ -391,7 +360,7 @@ static bool isPerMonitorDPIAwareThread()
 
 static double getGlobalDPI()
 {
-    setDPIAwareness();
+    HiddenMessageWindow::setDPIAwareness();
 
     ScopedDeviceContext deviceContext { nullptr };
     return (GetDeviceCaps (deviceContext.dc, LOGPIXELSX) + GetDeviceCaps (deviceContext.dc, LOGPIXELSY)) / 2.0;
@@ -2264,7 +2233,7 @@ private:
             if (canUseMultiTouch())
                 registerTouchWindow (hwnd, 0);
 
-            setDPIAwareness();
+            HiddenMessageWindow::setDPIAwareness();
             scaleFactor = getScaleFactorForWindow (hwnd);
 
             setMessageFilter();
@@ -5813,7 +5782,7 @@ static BOOL CALLBACK enumMonitorsProc (HMONITOR hm, HDC, LPRECT, LPARAM userInfo
 
 void Displays::findDisplays (const Desktop& desktop)
 {
-    setDPIAwareness();
+    HiddenMessageWindow::setDPIAwareness();
 
     Array<MonitorInfo> monitors;
     EnumDisplayMonitors (nullptr, nullptr, &enumMonitorsProc, (LPARAM) &monitors);
@@ -5858,7 +5827,7 @@ void Displays::findDisplays (const Desktop& desktop)
     }
 
    #if JUCE_WIN_PER_MONITOR_DPI_AWARE
-    setDPIAwareness();
+    HiddenMessageWindow::setDPIAwareness();
     updateToLogical();
    #else
     for (auto& d : displays)
