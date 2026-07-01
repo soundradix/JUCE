@@ -346,9 +346,9 @@ void MemoryBlock::loadFromHexString (StringRef hex)
             {
                 auto c = t.getAndAdvance();
 
-                if (c >= '0' && c <= '9')    { byte |= c - '0';        break; }
-                if (c >= 'a' && c <= 'z')    { byte |= c - ('a' - 10); break; }
-                if (c >= 'A' && c <= 'Z')    { byte |= c - ('A' - 10); break; }
+                if ('0' <= c && c <= '9')    { byte |= c - '0';        break; }
+                if ('a' <= c && c <= 'f')    { byte |= c - ('a' - 10); break; }
+                if ('A' <= c && c <= 'F')    { byte |= c - ('A' - 10); break; }
 
                 if (c == 0)
                 {

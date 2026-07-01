@@ -71,7 +71,7 @@ then the filename can be suffixed with one of the following (case insensitive) s
     _mac or _osx    <- compiled for macOS and OSX platforms only
     _windows        <- compiled for Windows platforms only
     _linux          <- compiled for Linux and FreeBSD platforms only
-    _andoid         <- compiled for Android platforms only
+    _android        <- compiled for Android platforms only
     _ios            <- compiled for iOS platforms only
 
 e.g.

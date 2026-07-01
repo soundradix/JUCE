@@ -113,6 +113,8 @@ XWindowSystemUtilities::Atoms::Atoms (::Display* display)
     windowType                   = getIfExists (display, "_NET_WM_WINDOW_TYPE");
     windowState                  = getIfExists (display, "_NET_WM_STATE");
     windowStateHidden            = getIfExists (display, "_NET_WM_STATE_HIDDEN");
+    windowStateMaximisedHorz     = getIfExists (display, "_NET_WM_STATE_MAXIMIZED_HORZ");
+    windowStateMaximisedVert     = getIfExists (display, "_NET_WM_STATE_MAXIMIZED_VERT");
 
     XdndAware                    = getCreating (display, "XdndAware");
     XdndEnter                    = getCreating (display, "XdndEnter");
@@ -3849,6 +3851,21 @@ bool XWindowSystem::isHidden (Window w) const
     const auto end = data + prop.numItems;
 
     return std::find (data, end, atoms.windowStateHidden) != end;
+}
+
+bool XWindowSystem::isFullScreen (Window w) const
+{
+    XWindowSystemUtilities::ScopedXLock xLock;
+    XWindowSystemUtilities::GetXProperty prop (display, w, atoms.windowState, 0, 128, false, XA_ATOM);
+
+    if (! (prop.success && prop.actualFormat == 32 && prop.actualType == XA_ATOM))
+        return false;
+
+    const auto* data = unalignedPointerCast<const long*> (prop.data);
+    const auto end = data + prop.numItems;
+
+    return    std::find (data, end, atoms.windowStateMaximisedHorz) != end
+           && std::find (data, end, atoms.windowStateMaximisedVert) != end;
 }
 
 void XWindowSystem::propertyNotifyEvent (LinuxComponentPeer* peer, const XPropertyEvent& event) const

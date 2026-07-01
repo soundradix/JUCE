@@ -35,6 +35,32 @@
 namespace juce
 {
 
+JUCE_BEGIN_IGNORE_DEPRECATION_WARNINGS
+InAppPurchases::Purchase::Purchase() = default;
+
+InAppPurchases::Purchase::Purchase (String orderIdIn,
+                                    StringArray productIdsIn,
+                                    String applicationBundleNameIn,
+                                    Time timeOfPurchaseIn,
+                                    String purchaseTokenIn)
+    : orderId (std::move (orderIdIn)),
+      productIds (std::move (productIdsIn)),
+      applicationBundleName (std::move (applicationBundleNameIn)),
+      purchaseTime (timeOfPurchaseIn.toString (true, true, true, true)),
+      timeOfPurchase (std::move (timeOfPurchaseIn)),
+      purchaseToken (std::move (purchaseTokenIn))
+{
+}
+
+InAppPurchases::Purchase::Purchase (const Purchase&) = default;
+InAppPurchases::Purchase::Purchase (Purchase&&) noexcept = default;
+
+auto InAppPurchases::Purchase::operator= (const Purchase&) -> Purchase& = default;
+auto InAppPurchases::Purchase::operator= (Purchase&&) noexcept -> Purchase& = default;
+
+InAppPurchases::Purchase::~Purchase() = default;
+JUCE_END_IGNORE_DEPRECATION_WARNINGS
+
 //==============================================================================
 InAppPurchases::InAppPurchases()
    #if JUCE_ANDROID || JUCE_IOS || JUCE_MAC

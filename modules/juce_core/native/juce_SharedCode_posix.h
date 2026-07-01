@@ -309,9 +309,9 @@ static bool setFileModeFlags (const String& fullPath, mode_t flags, bool shouldS
     info.st_mode &= 0777;
 
     if (shouldSet)
-        info.st_mode |= flags;
+        info.st_mode |= (decltype (info.st_mode)) flags;
     else
-        info.st_mode &= ~flags;
+        info.st_mode &= (decltype (info.st_mode)) ~flags;
 
     return chmod (fullPath.toUTF8(), (mode_t) info.st_mode) == 0;
 }

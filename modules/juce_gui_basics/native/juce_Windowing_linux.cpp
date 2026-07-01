@@ -414,6 +414,7 @@ public:
             XWindowSystem::getInstance()->updateConstraints (windowH);
 
         physicalBounds = XWindowSystem::getInstance()->getWindowBounds (windowH, parentWindow);
+        fullScreen = XWindowSystem::getInstance()->isFullScreen (windowH);
         updateScaleFactorFromNewBounds (physicalBounds, true);
 
         updateVBlankTimer();
