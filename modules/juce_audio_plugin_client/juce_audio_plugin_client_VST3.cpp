@@ -1510,7 +1510,36 @@ public:
                                           || detail::PluginUtilities::getHostType().isPremiere());
 
             if (mayCreateEditor)
-                return new JuceVST3Editor (*this, *audioProcessor);
+            {
+                // liveEditorView and the stale-view release below are a Premiere-only mechanism.
+                // For every other host this block is just `return new JuceVST3Editor (...)`, exactly
+                // as before — liveEditorView is never set, so the release path can never run.
+                //
+                // The black-box-on-reopen bug (POWAIR #75 / #11) was QA-confirmed in Premiere only:
+                // it leaks the prior view (never calls removed()), so that view's editor still squats
+                // the AudioProcessor's single active-editor slot — the new view's
+                // createEditorAndMakeActive() returns nullptr, leaving an editor-less
+                // ContentWrapperComponent the host shows as a tiny black box. Release the stale view's
+                // editor first so the new view can take the slot. We recreate rather than hand back the
+                // stale view: it is still attached to the old parent window and JUCE's attached() has
+                // no re-attach path, so reusing it would attach an already-attached component twice.
+                const auto isPremiere = detail::PluginUtilities::getHostType().isPremiere();
+
+                // liveEditorView is only ever set for Premiere (below), so a non-null pointer here
+                // implies Premiere.
+                if (liveEditorView != nullptr)
+                {
+                    jassert (isPremiere);
+                    liveEditorView->releaseEditorContent();
+                }
+
+                auto* editorView = new JuceVST3Editor (*this, *audioProcessor);
+
+                if (isPremiere)
+                    liveEditorView = editorView;
+
+                return editorView;
+            }
         }
 
         return nullptr;
@@ -2016,7 +2045,11 @@ private:
            #endif
         }
 
-        ~JuceVST3Editor() override = default; // NOLINT
+        ~JuceVST3Editor() override
+        {
+            if (owner->liveEditorView == this)
+                owner->liveEditorView = nullptr;
+        }
 
         tresult PLUGIN_API queryInterface (const TUID targetIID, void** obj) override
         {
@@ -2102,9 +2135,35 @@ private:
                 lastReportedSize.reset();
             }
 
+            if (owner->liveEditorView == this)
+                owner->liveEditorView = nullptr;
+
             viewRunLoop.reset();
 
             return CPluginView::removed();
+        }
+
+        // Releases just the editor content (and its mac window attachment) without otherwise
+        // disturbing this view's host-facing attachment state. Used to free the AudioProcessor's
+        // single active-editor slot when Premiere opens a new view over a stale one
+        // (see createView). Leaves an empty, reusable view object behind. (POWAIR #75 / #11)
+        void releaseEditorContent()
+        {
+            if (component == nullptr)
+                return;
+
+           #if JUCE_WINDOWS
+            component->removeFromDesktop();
+           #elif JUCE_MAC
+            if (macHostWindow != nullptr)
+            {
+                detail::VSTWindowUtilities::detachComponentFromWindowRefVST (component.get(), macHostWindow);
+                macHostWindow = nullptr;
+            }
+           #endif
+
+            component = nullptr;
+            lastReportedSize.reset();
         }
 
         tresult PLUGIN_API onSize (ViewRect* newSize) override
@@ -2550,6 +2609,12 @@ private:
         //==============================================================================
         JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3Editor)
     };
+
+    // Non-owning pointer to the most-recently-created editor view. Premiere-only: it is set only
+    // when the host is Premiere (left null for every other host), and the owning JuceVST3Editor
+    // clears it on removed()/destruction. Used to release a stale view's editor when Premiere
+    // creates a new view over the old one without releasing it (see createView).
+    JuceVST3Editor* liveEditorView = nullptr;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (JuceVST3EditController)
 

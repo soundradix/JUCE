@@ -114,6 +114,10 @@
  #define JUCE_CUSTOM_VST3_SDK 0
 #endif
 
+#if JucePlugin_EnhancedAudioSuite
+ #define RANDOM_AUDIO_ACCESS_SUPPORTED 1
+#endif
+
 //==============================================================================
 #include <juce_audio_processors_headless/format/juce_PluginFormatDefs.h>
 #include <juce_audio_processors_headless/processors/juce_AudioProcessorListener.h>
