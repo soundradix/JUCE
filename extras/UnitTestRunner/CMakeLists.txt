@@ -14,7 +14,9 @@
 #
 # ==============================================================================
 
-juce_add_console_app(UnitTestRunner)
+juce_add_console_app(UnitTestRunner
+    NEEDS_WEB_BROWSER FALSE
+    NEEDS_CURL FALSE)
 
 juce_generate_juce_header(UnitTestRunner)
 

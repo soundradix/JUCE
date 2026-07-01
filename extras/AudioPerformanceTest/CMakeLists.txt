@@ -14,7 +14,9 @@
 #
 # ==============================================================================
 
-juce_add_gui_app(AudioPerformanceTest BUNDLE_ID com.juce.AudioPerformanceTest)
+juce_add_gui_app(AudioPerformanceTest BUNDLE_ID com.juce.AudioPerformanceTest
+    NEEDS_CURL FALSE
+    NEEDS_WEB_BROWSER FALSE)
 
 juce_generate_juce_header(AudioPerformanceTest)
 
@@ -22,7 +24,8 @@ target_sources(AudioPerformanceTest PRIVATE
     Source/Main.cpp)
 
 target_compile_definitions(AudioPerformanceTest PRIVATE
-    JUCE_USE_CURL=0 JUCE_WEB_BROWSER=0)
+    JUCE_USE_CURL=0
+    JUCE_WEB_BROWSER=0)
 
 target_link_libraries(AudioPerformanceTest PRIVATE
     juce::juce_audio_utils

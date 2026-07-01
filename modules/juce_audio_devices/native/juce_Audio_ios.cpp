@@ -527,9 +527,11 @@ struct iOSAudioIODevice::Pimpl final : public AsyncUpdater
         // probing the sample rate via an AudioQueue seems to work reliably
         if (@available (iOS 18, *))
         {
-            // On iOS 26, things seem to work as expected again,
-            // so avoid creating an AudioQueue
-            if (@available (iOS 26, *))
+            // We could verify that things seem to work as expected again
+            // from 18.7.3 and up, so avoid creating an AudioQueue. We
+            // have no way of testing the minor versions 18.7.0 to 18.7.2,
+            // as currently no simulator is available for 18.7.
+            if (@available (iOS 18.7.3, *))
                 return session.sampleRate;
 
             return getSampleRateFromAudioQueue().value_or (session.sampleRate);
