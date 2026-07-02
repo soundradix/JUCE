@@ -1578,7 +1578,7 @@ auto ump::Endpoints::Impl::Native::make (EndpointsListener& l) -> std::unique_pt
 
 #else
 
-auto ump::Endpoints::Impl::Native::make (EndpointsListener& l) -> std::unique_ptr<Native>
+auto ump::Endpoints::Impl::Native::make (EndpointsListener&) -> std::unique_ptr<Native>
 {
     return nullptr;
 }
