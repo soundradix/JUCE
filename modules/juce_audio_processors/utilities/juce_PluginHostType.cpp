@@ -319,6 +319,16 @@ PluginHostType::HostType PluginHostType::getHostType()
     if (hostFilename.startsWith           ("Bitwig"))            return BitwigStudio;
     if (hostFilename.containsIgnoreCase   ("pluginval"))         return pluginval;
     if (hostFilename.containsIgnoreCase   ("AudioPluginHost"))   return JUCEPluginHost;
+    if (hostFilename.containsIgnoreCase   ("reaper"))            return Reaper;
+
+    if (   hostFilename.containsIgnoreCase ("Renoise")
+        || File { hostPath }.getParentDirectory()
+                            .getParentDirectory()
+                            .getChildFile ("renoise")
+                            .existsAsFile())
+    {
+        return Renoise;
+    }
 
    #elif JUCE_IOS
    #elif JUCE_ANDROID
