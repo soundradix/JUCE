@@ -113,6 +113,8 @@ void DrawableImage::paint (Graphics& g)
 {
     if (image.isValid())
     {
+        g.setImageResamplingQuality (resamplingQuality);
+
         if (opacity > 0.0f && ! overlayColour.isOpaque())
         {
             g.setOpacity (opacity);
@@ -140,6 +142,11 @@ bool DrawableImage::hitTest (int x, int y)
 Path DrawableImage::getOutlineAsPath() const
 {
     return {}; // not applicable for images
+}
+
+void DrawableImage::setImageResamplingQuality (Graphics::ResamplingQuality newQuality)
+{
+    resamplingQuality = newQuality;
 }
 
 //==============================================================================

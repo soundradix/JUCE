@@ -95,6 +95,15 @@ public:
     */
     Parallelogram<float> getBoundingBox() const noexcept        { return bounds; }
 
+    /** Sets the resampling quality to use when drawing the image.
+
+        This will have the most noticeable effect when the DrawableImage size does not match the
+        image size.
+
+        Defaults to highResamplingQuality.
+    */
+    void setImageResamplingQuality (Graphics::ResamplingQuality newQuality);
+
     //==============================================================================
     /** @internal */
     void paint (Graphics&) override;
@@ -118,6 +127,7 @@ private:
     float opacity = 1.0f;
     Colour overlayColour { 0 };
     Parallelogram<float> bounds;
+    Graphics::ResamplingQuality resamplingQuality = Graphics::ResamplingQuality::highResamplingQuality;
 
     DrawableImage& operator= (const DrawableImage&);
     JUCE_LEAK_DETECTOR (DrawableImage)
