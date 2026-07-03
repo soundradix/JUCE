@@ -80,32 +80,34 @@ void OpenGLTexture::create (const int w, const int h, const void* pixels, GLenum
     glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
     JUCE_CHECK_OPENGL_ERROR
 
-    const auto textureNpotSupported = ownerContext->isTextureNpotSupported();
-
-    const auto getAllowedTextureSize = [&] (int n)
+    if (! tryAllocTexture (w, h, type))
     {
-        return textureNpotSupported ? n : nextPowerOfTwo (n);
-    };
-
-    width  = getAllowedTextureSize (w);
-    height = getAllowedTextureSize (h);
-    flipped = false;
-
-    const GLint internalformat = type == GL_ALPHA ? GL_ALPHA : GL_RGBA;
-
-    if (width != w || height != h)
-    {
-        glTexImage2D (GL_TEXTURE_2D, 0, internalformat,
-                      width, height, 0, type, GL_UNSIGNED_BYTE, nullptr);
-
-        glTexSubImage2D (GL_TEXTURE_2D, 0, 0, topLeft ? (height - h) : 0, w, h,
-                         type, GL_UNSIGNED_BYTE, pixels);
+        // Completely failed to create a workable texture
+        jassertfalse;
+        return;
     }
-    else
+
+    GLint detectedWidth{}, detectedHeight{};
+    glGetTexLevelParameteriv (GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &detectedWidth);
+    glGetTexLevelParameteriv (GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &detectedHeight);
+    std::tie (width, height) = std::tie (detectedWidth, detectedHeight);
+
+    if (width < w || height < h)
     {
-        glTexImage2D (GL_TEXTURE_2D, 0, internalformat,
-                      w, h, 0, type, GL_UNSIGNED_BYTE, pixels);
+        // Created a texture, but it's not large enough, somehow
+        jassertfalse;
+        return;
     }
+
+    glTexSubImage2D (GL_TEXTURE_2D,
+                     0,
+                     0,
+                     topLeft ? (height - h) : 0,
+                     w,
+                     h,
+                     type,
+                     GL_UNSIGNED_BYTE,
+                     pixels);
 
     JUCE_CHECK_OPENGL_ERROR
 

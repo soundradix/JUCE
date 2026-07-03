@@ -182,8 +182,7 @@ class MidiDeviceListConnectionBroadcaster : private AsyncUpdater,
                     if (! blockName.has_value())
                         continue;
 
-                    const auto separator = endpoint->getName().isEmpty() || blockName->isEmpty() ? "" : " ";
-                    const auto name = endpoint->getName() + separator + *blockName;
+                    const auto name = buildName (endpoint->getName(), *blockName);
 
                     result.add (MidiDeviceInfo { name, groupId });
                 }
@@ -343,10 +342,18 @@ private:
         if (! blockName.has_value())
             return {};
 
-        const auto separator = endpoint->getName().isEmpty() || blockName->isEmpty() ? "" : " : ";
-        const auto name = endpoint->getName() + separator + *blockName;
+        const auto name = buildName (endpoint->getName(), *blockName);
 
         return MidiDeviceInfo { name, key.identifier };
+    }
+
+    static String buildName (String endpoint, String block)
+    {
+        const auto separator = endpoint.isEmpty() || block.isEmpty() ? "" : " ";
+
+        MemoryOutputStream stream;
+        stream << endpoint << separator << block;
+        return stream.toString();
     }
 
     std::optional<Endpoints> endpoints;
