@@ -63,6 +63,12 @@
 
 #elif JUCE_LINUX || JUCE_BSD
  #include <unistd.h>
+#elif JUCE_WINDOWS
+ #include <shellscalingapi.h>
+
+ #if ! JUCE_DONT_AUTOLINK_TO_WIN32_LIBRARIES
+  #pragma comment(lib, "shcore.lib")
+ #endif
 #endif
 
 //==============================================================================
@@ -97,6 +103,7 @@
 #elif JUCE_WINDOWS
  #include "native/juce_RunningInUnity.h"
  #include "native/juce_Messaging_windows.cpp"
+ #include "native/juce_HiddenMessageWindow_windows.cpp"
  #if JUCE_EVENTS_INCLUDE_WINRT_WRAPPER
   #include "native/juce_WinRTWrapper_windows.cpp"
  #endif
