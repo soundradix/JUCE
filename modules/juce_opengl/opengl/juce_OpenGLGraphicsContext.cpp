@@ -1848,7 +1848,7 @@ private:
     void imageDataBeingDeleted (ImagePixelData* ipd) override
     {
         observedPixelData.erase (ipd);
-        activeTextures.bindTexture (0);
+        activeTextures.bindTexture (shaderQuadQueue, 0);
     }
 
     void imageDataChanged (ImagePixelData*) override {}
