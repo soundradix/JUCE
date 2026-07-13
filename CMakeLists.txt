@@ -16,7 +16,14 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+get_property(_juce_initial_global_languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+
 project(JUCE VERSION 8.0.14 LANGUAGES C CXX)
+
+if(NOT (JUCE_IS_TOP_LEVEL OR "C" IN_LIST _juce_initial_global_languages))
+    message(FATAL_ERROR "A C compiler is required to build targets that depend on JUCE. "
+        "Add 'C' to your project's LANGUAGES.")
+endif()
 
 include(CMakeDependentOption)
 
@@ -143,6 +150,9 @@ configure_package_config_file("${JUCE_CMAKE_UTILS_DIR}/JUCEConfig.cmake.in"
 
 install(FILES "${JUCE_BINARY_DIR}/JUCEConfigVersion.cmake"
               "${JUCE_BINARY_DIR}/JUCEConfig.cmake"
+              "${JUCE_CMAKE_UTILS_DIR}/FindCppwinrt.cmake"
+              "${JUCE_CMAKE_UTILS_DIR}/FindWebView2.cmake"
+              "${JUCE_CMAKE_UTILS_DIR}/FindWindowsMIDIServices.cmake"
               "${JUCE_CMAKE_UTILS_DIR}/JUCECheckAtomic.cmake"
               "${JUCE_CMAKE_UTILS_DIR}/JUCEHelperTargets.cmake"
               "${JUCE_CMAKE_UTILS_DIR}/JUCEModuleSupport.cmake"

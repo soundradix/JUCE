@@ -353,6 +353,7 @@ namespace Ids
     DECLARE_ID (pluginProducesMidiOut);
     DECLARE_ID (pluginIsMidiEffectPlugin);
     DECLARE_ID (pluginEditorRequiresKeys);
+    DECLARE_ID (pluginLV2PluginClass);
     DECLARE_ID (pluginVSTCategory);
     DECLARE_ID (pluginVST3Category);
     DECLARE_ID (pluginAUExportPrefix);

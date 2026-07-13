@@ -866,13 +866,16 @@ struct AlsaMidiHelpers
             return rawToUniquePtr (new Port { c, portId, d, connected });
         }
 
-        bool isUmpEndpoint() const
+        int getMidiVersion() const
         {
-            return portId == -1;
+            return midiVersion;
         }
 
     private:
-        Port (std::shared_ptr<Client> c, int p, std::optional<ump::IOKind> dir, std::optional<snd_seq_addr_t> dst)
+        Port (std::shared_ptr<Client> c,
+              int p,
+              std::optional<ump::IOKind> dir,
+              std::optional<snd_seq_addr_t> dst)
             : client (c),
               portId (p),
               direction (dir),
@@ -922,6 +925,22 @@ struct AlsaMidiHelpers
         WaitFreeListeners<InputCallback> inputCallbacks;
         // Disconnect listeners are called on the main thread
         ListenerList<ump::DisconnectionListener> disconnectCallbacks;
+        int midiVersion = std::invoke ([&]() -> int
+        {
+            if (! connected.has_value())
+                return SND_SEQ_CLIENT_UMP_MIDI_2_0;
+
+            snd_seq_client_info_t* info{};
+            snd_seq_client_info_alloca (&info);
+
+            if (snd_seq_get_any_client_info (client->getSequencer(), connected->client, info) != 0)
+                return SND_SEQ_CLIENT_LEGACY_MIDI;
+
+            if (snd_seq_client_info_get_midi_version == nullptr)
+                return SND_SEQ_CLIENT_LEGACY_MIDI;
+
+            return snd_seq_client_info_get_midi_version (info);
+        });
 
         JUCE_DECLARE_NON_COPYABLE (Port)
     };
@@ -1011,7 +1030,7 @@ struct AlsaMidiHelpers
 
         bool send (ump::Iterator b, ump::Iterator e) override
         {
-            if (snd_seq_ump_event_output_direct != nullptr)
+            if (snd_seq_ump_event_output_direct != nullptr && port->getMidiVersion() != SND_SEQ_CLIENT_LEGACY_MIDI)
             {
                 for (const auto& v : makeRange (b, e))
                     sendUmp (v);
@@ -1543,7 +1562,7 @@ auto ump::Endpoints::Impl::Native::make (EndpointsListener& l) -> std::unique_pt
 
 #else
 
-auto ump::Endpoints::Impl::Native::make (EndpointsListener& l) -> std::unique_ptr<Native>
+auto ump::Endpoints::Impl::Native::make (EndpointsListener&) -> std::unique_ptr<Native>
 {
     return nullptr;
 }

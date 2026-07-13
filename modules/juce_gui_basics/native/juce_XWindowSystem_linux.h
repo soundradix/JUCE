@@ -78,7 +78,8 @@ namespace XWindowSystemUtilities
 
         static constexpr unsigned long DndVersion = 3;
 
-        Atom protocols, protocolList[3], changeState, state, userTime, activeWin, pid, windowType, windowState, windowStateHidden,
+        Atom protocols, protocolList[3], changeState, state, userTime, activeWin, pid, windowType, windowState,
+             windowStateHidden, windowStateMaximisedHorz, windowStateMaximisedVert,
              XdndAware, XdndEnter, XdndLeave, XdndPosition, XdndStatus, XdndDrop, XdndFinished, XdndSelection,
              XdndTypeList, XdndActionList, XdndActionDescription, XdndActionCopy, XdndActionPrivate,
              XembedMsgType, XembedInfo, allowedActions[5], allowedMimeTypes[4], utf8String, clipboard, targets;
@@ -182,6 +183,7 @@ public:
 
     void setMinimised (::Window, bool shouldBeMinimised) const;
     bool isMinimised  (::Window) const;
+    bool isFullScreen (::Window) const;
 
     void setMaximised (::Window, bool shouldBeMinimised) const;
 

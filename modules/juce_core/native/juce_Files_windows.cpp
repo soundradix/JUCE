@@ -707,6 +707,7 @@ File JUCE_CALLTYPE File::getSpecialLocation (const SpecialLocationType type)
         case commonDocumentsDirectory:          csidlType = CSIDL_COMMON_DOCUMENTS;     break;
         case globalApplicationsDirectory:       csidlType = CSIDL_PROGRAM_FILES;        break;
         case globalApplicationsDirectoryX86:    csidlType = CSIDL_PROGRAM_FILESX86;     break;
+        case windowsProgramFilesCommon:         csidlType = CSIDL_PROGRAM_FILES_COMMON; break;
         case windowsLocalAppData:               csidlType = CSIDL_LOCAL_APPDATA;        break;
         case userMusicDirectory:                csidlType = 0x0d; /*CSIDL_MYMUSIC*/     break;
         case userMoviesDirectory:               csidlType = 0x0e; /*CSIDL_MYVIDEO*/     break;

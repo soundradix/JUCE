@@ -609,7 +609,8 @@ private:
         if (responder == nullptr)
             return;
 
-        const auto object = JSON::fromString (String (buffer.getData(), lengthsBuffer.getJsonLength()));
+        const auto object = JSON::fromString (String { CharPointer_UTF8 { buffer.getData() },
+                                                       lengthsBuffer.getJsonLength() });
 
         if (object.isVoid())
             return;

@@ -585,6 +585,11 @@ attributes directly to these creation functions, rather than adding them later.
   `kPlugCategGenerator`. Defaults to `kPlugCategSynth` if `IS_SYNTH` is `TRUE`. Otherwise defaults
   to `kPlugCategEffect`.
 
+`LV2_PLUGIN_CLASS`
+- Should be set to the name of one of the Plugin classes found at
+  https://lv2plug.in/ns/lv2core#Plugin. Defaults to "InstrumentPlugin" for synth plugins, and
+  "Plugin" otherwise.
+
 `VST3_CATEGORIES`
 - Should be one or more, separated by spaces, of the following: `Fx`, `Instrument`, `Analyzer`,
   `Delay`, `Distortion`, `Drum`, `Dynamics`, `EQ`, `External`, `Filter`, `Generator`, `Mastering`,

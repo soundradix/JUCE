@@ -73,7 +73,8 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
                                      "-Wunused-parameter",
                                      "-Wzero-as-null-pointer-constant",
                                      "-Wdangling-else",
-                                     "-Wnontrivial-memcall")
+                                     "-Wnontrivial-memcall",
+                                     "-Wnewline-eof")
 
 #undef DEVELOPMENT
 #define DEVELOPMENT 0  // This avoids a Clang warning in Steinberg code about unused values

@@ -184,7 +184,8 @@ namespace juce
                                         "-Wshadow-field-in-constructor",
                                         "-Wshadow-field",
                                         "-Wsign-conversion",
-                                        "-Wswitch-enum")
+                                        "-Wswitch-enum",
+                                        "-Wshorten-64-to-32")
    #include <oboe/Oboe.h>
    JUCE_END_IGNORE_WARNINGS_GCC_LIKE
 

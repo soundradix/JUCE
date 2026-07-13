@@ -25,6 +25,8 @@ class HiddenMessageWindow
 public:
     HiddenMessageWindow (const TCHAR* const messageWindowName, WNDPROC wndProc)
     {
+        setDPIAwareness();
+
         String className ("JUCE_");
         className << String::toHexString (Time::getHighResolutionTicks());
 
@@ -53,6 +55,8 @@ public:
     }
 
     inline HWND getHWND() const noexcept     { return hwnd; }
+
+    static bool setDPIAwareness();
 
 private:
     ATOM atom;

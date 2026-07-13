@@ -38,9 +38,6 @@ public:
     /** Creates a new unique ID, compliant with RFC 4122 version 4. */
     Uuid();
 
-    /** Destructor. */
-    ~Uuid() noexcept;
-
     /** Creates a copy of another UUID. */
     Uuid (const Uuid&) noexcept;
 
@@ -134,6 +131,7 @@ private:
     uint8 uuid[sizeInBytes];
     String getHexRegion (int, int) const;
     int compare (Uuid) const noexcept;
+    void swap (Uuid&) noexcept;
 
     JUCE_LEAK_DETECTOR (Uuid)
 };

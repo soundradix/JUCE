@@ -4282,8 +4282,9 @@ public:
                      "/usr/local/lib/lv2;"
                      "/usr/lib/lv2;" };
           #elif JUCE_WINDOWS
-            return { "%APPDATA%\\LV2;"
-                     "%COMMONPROGRAMFILES%\\LV2" };
+            const auto localAppData = File::getSpecialLocation (File::userApplicationDataDirectory).getFullPathName();
+            const auto programFiles = File::getSpecialLocation (File::windowsProgramFilesCommon).getFullPathName();
+            return { localAppData + "\\LV2;" + programFiles + "\\LV2" };
           #else
            #if JUCE_64BIT
             if (File ("/usr/lib64/lv2").exists() || File ("/usr/local/lib64/lv2").exists())

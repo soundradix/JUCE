@@ -373,7 +373,7 @@ void JNIClassBase::tryLoadingClassWithClassLoader (JNIEnv* env, jobject classLoa
     // a non-nullptr. So don't assign the result of this call to a jobject just yet...
     LocalRef classObj { (jclass) env->CallObjectMethod (classLoader, JavaClassLoader.loadClass, classNameAndPackage.get(), (jboolean) true) };
 
-    if (jthrowable exception = env->ExceptionOccurred())
+    if (env->ExceptionOccurred() != nullptr)
     {
         env->ExceptionClear();
         classObj = {};
