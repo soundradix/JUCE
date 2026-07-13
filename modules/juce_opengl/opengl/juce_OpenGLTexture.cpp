@@ -73,7 +73,6 @@ void OpenGLTexture::create (const int w, const int h, const void* pixels, GLenum
 
     width  = getAllowedTextureSize (w);
     height = getAllowedTextureSize (h);
-    flipped = false;
 
     const GLint internalformat = type == GL_ALPHA ? GL_ALPHA : GL_RGBA;
 
