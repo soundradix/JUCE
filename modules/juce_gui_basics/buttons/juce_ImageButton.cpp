@@ -27,10 +27,6 @@ ImageButton::ImageButton (const String& text_)
 {
 }
 
-ImageButton::~ImageButton()
-{
-}
-
 void ImageButton::setImages (const bool resizeButtonNowToFitThisImage,
                              const bool rescaleImagesWhenButtonSizeChanges,
                              const bool preserveImageProportions,
@@ -104,6 +100,8 @@ void ImageButton::paintButton (Graphics& g,
                                bool shouldDrawButtonAsHighlighted,
                                bool shouldDrawButtonAsDown)
 {
+    g.setImageResamplingQuality (resamplingQuality);
+
     if (! isEnabled())
     {
         shouldDrawButtonAsHighlighted = false;
@@ -186,6 +184,12 @@ bool ImageButton::hitTest (int x, int y)
     return im.isNull() || ((! imageBounds.isEmpty())
                             && alphaThreshold < im.getPixelAt (((x - imageBounds.getX()) * im.getWidth()) / imageBounds.getWidth(),
                                                                ((y - imageBounds.getY()) * im.getHeight()) / imageBounds.getHeight()).getAlpha());
+}
+
+void ImageButton::setImageResamplingQuality (Graphics::ResamplingQuality newQuality)
+{
+    if (std::exchange (resamplingQuality, newQuality) != newQuality)
+        repaint();
 }
 
 } // namespace juce

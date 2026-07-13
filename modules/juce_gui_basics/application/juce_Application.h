@@ -127,7 +127,7 @@ public:
     bool moreThanOneInstanceAllowed() override;
 
     /** Indicates that the user has tried to start up another instance of the app.
-        This will get called even if moreThanOneInstanceAllowed() is false.
+        This will get called only if moreThanOneInstanceAllowed() is false.
     */
     void anotherInstanceStarted (const String& commandLine) override;
 

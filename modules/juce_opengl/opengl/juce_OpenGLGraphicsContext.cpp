@@ -1616,7 +1616,7 @@ private:
 };
 
 //==============================================================================
-struct GLState
+struct GLState : private ImagePixelData::Listener
 {
     explicit GLState (const Target& t) noexcept
         : target (t),
@@ -1638,9 +1638,15 @@ struct GLState
         JUCE_CHECK_OPENGL_ERROR
     }
 
-    ~GLState()
+    ~GLState() override
     {
         flush();
+
+        for (auto* pixelData : observedPixelData)
+        {
+            pixelData->listeners.remove (this);
+        }
+
         target.context.extensions.glBindFramebuffer (GL_FRAMEBUFFER, previousFrameBufferTarget);
     }
 
@@ -1769,13 +1775,21 @@ struct GLState
         JUCE_CHECK_OPENGL_ERROR
     }
 
-    void setShaderForTiledImageFill (const TextureInfo& textureInfo,
+    void setShaderForTiledImageFill (const Image& image,
                                      const AffineTransform& transform,
                                      int maskTextureID,
                                      const Rectangle<int>* maskArea,
                                      bool isTiledFill,
                                      BlendMode mode)
     {
+        if (auto pd = image.getPixelData())
+        {
+            observedPixelData.insert (pd.get());
+            pd->listeners.add (this);
+        }
+
+        const auto textureInfo = cachedImageList->getTextureFor (image);
+
         blendMode.setBlendMode (shaderQuadQueue, mode);
         auto programs = currentShader.programs;
 
@@ -1836,6 +1850,18 @@ private:
     GLuint previousFrameBufferTarget;
     SavedBinding<TraitsVAO> savedVAOBinding;
     ViewportRestorer viewportRestorer;
+    std::set<ImagePixelData*> observedPixelData;
+
+    void imageDataBeingDeleted (ImagePixelData* ipd) override
+    {
+        observedPixelData.erase (ipd);
+        activeTextures.bindTexture (shaderQuadQueue, 0);
+    }
+
+    void imageDataChanged (ImagePixelData*) override {}
+
+    JUCE_DECLARE_NON_COPYABLE (GLState)
+    JUCE_DECLARE_NON_MOVEABLE (GLState)
 };
 
 //==============================================================================
@@ -1909,7 +1935,7 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
     {
         state->shaderQuadQueue.flush();
 
-        state->setShaderForTiledImageFill (state->cachedImageList->getTextureFor (src),
+        state->setShaderForTiledImageFill (src,
                                            trans,
                                            0,
                                            nullptr,

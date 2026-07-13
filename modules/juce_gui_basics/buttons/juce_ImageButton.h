@@ -43,9 +43,6 @@ public:
     */
     explicit ImageButton (const String& name = String());
 
-    /** Destructor. */
-    ~ImageButton() override;
-
     //==============================================================================
     /** Sets up the images to draw in various states.
 
@@ -130,6 +127,15 @@ public:
                                       const Colour& overlayColour, float imageOpacity, ImageButton&) = 0;
     };
 
+    /** Sets the resampling quality to use when drawing the image.
+
+        This will have the most noticeable effect when the ImageButton size does not match the
+        image size.
+
+        Defaults to highResamplingQuality.
+    */
+    void setImageResamplingQuality (Graphics::ResamplingQuality newQuality);
+
 protected:
     //==============================================================================
     /** @internal */
@@ -145,6 +151,7 @@ private:
     Image normalImage, overImage, downImage;
     float normalOpacity, overOpacity, downOpacity;
     Colour normalOverlay, overOverlay, downOverlay;
+    Graphics::ResamplingQuality resamplingQuality = Graphics::ResamplingQuality::highResamplingQuality;
 
     Image getCurrentImage() const;
 

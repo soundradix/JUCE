@@ -324,7 +324,7 @@ private:
 };
 
 //==============================================================================
-struct MenuWindow final : public Component
+struct MenuWindow final : public Component, private AsyncUpdater
 {
     MenuWindow (const PopupMenu& menu,
                 MenuWindow* parentWindow,
@@ -615,17 +615,28 @@ struct MenuWindow final : public Component
 
     void visibilityChanged() override
     {
+        // If the component that spawns the MenuWindow is in a modal state, grabbing the focus will
+        // fail, because the ModalComponentManager cannot establish a parent-child relationship
+        // between the PopupMenu and the MenuWindow.
+        //
+        // Our workaround is to wait until after the MenuWindow itself has been put into the modal
+        // state, and only then run the code grabbing the focus.
+        triggerAsyncUpdate();
+    }
+
+    void handleAsyncUpdate() override
+    {
         if (! isShowing())
             return;
 
-        auto* accessibleFocus = [this]
+        auto* accessibleFocus = std::invoke ([this]
         {
-          if (currentChild != nullptr)
-              if (auto* childHandler = currentChild->getAccessibilityHandler())
-                  return childHandler;
+            if (currentChild != nullptr)
+                if (auto* childHandler = currentChild->getAccessibilityHandler())
+                    return childHandler;
 
             return getAccessibilityHandler();
-        }();
+        });
 
         if (accessibleFocus != nullptr)
             accessibleFocus->grabFocus();

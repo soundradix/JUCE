@@ -192,7 +192,7 @@ private:
         }
 
         args.add (startPath.getFullPathName());
-        args.add ("(" + owner.filters.replaceCharacter (';', ' ') + ")");
+        args.add ("(" + owner.filters.replaceCharacter (';', ' ').trim() + ")");
     }
 
     void addZenityArgs()
@@ -250,6 +250,7 @@ private:
         {
             StringArray tokens;
             tokens.addTokens (owner.filters, ";,|", "\"");
+            tokens.removeEmptyStrings();
 
             args.add ("--file-filter=" + tokens.joinIntoString (" "));
         }
