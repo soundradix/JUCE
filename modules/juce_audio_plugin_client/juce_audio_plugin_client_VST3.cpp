@@ -3526,9 +3526,18 @@ public:
             if (! ins.has_value() || ! outs.has_value())
                 return {};
 
-            AudioProcessor::BusesLayout result;
-            result.inputBuses  = *ins;
-            result.outputBuses = *outs;
+            // Hosts with no use for auxiliary buses (e.g. WaveLab, which has no sidechain
+            // routing) may provide arrangements for the main buses only. Buses the host
+            // didn't mention keep their current layout, so that the request can still be
+            // applied and answered with kResultTrue.
+            auto result = pluginInstance->getBusesLayout();
+
+            for (int i = 0; i < ins->size(); ++i)
+                result.inputBuses.set (i, ins->getUnchecked (i));
+
+            for (int i = 0; i < outs->size(); ++i)
+                result.outputBuses.set (i, outs->getUnchecked (i));
+
             return result;
         }();
 
