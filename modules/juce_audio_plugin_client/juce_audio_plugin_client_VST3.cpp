@@ -3485,18 +3485,41 @@ public:
     {
         const FLStudioDIYSpecificationEnforcementLock lock (flStudioDIYSpecificationEnforcementMutex);
 
-        if (active)
-        {
-            // The host is misbehaving! The plugin must be deactivated before setting new arrangements.
-            jassertfalse;
-            return kResultFalse;
-        }
-
         auto numInputBuses  = pluginInstance->getBusCount (true);
         auto numOutputBuses = pluginInstance->getBusCount (false);
 
         if (numIns > numInputBuses || numOuts > numOutputBuses)
             return kResultFalse;
+
+        if (active)
+        {
+            // Some hosts, e.g. WaveLab, call setBusArrangements while the plugin is active
+            // (notably when reacting to a kLatencyChanged restart) and disable or mute the
+            // plugin when the call fails. Applying a new layout now would be unsafe, but a
+            // request matching the arrangements we already report is a no-op, so accept it.
+            const auto matchesCurrentArrangements = [this] (Vst::BusDirection dir,
+                                                            Vst::SpeakerArrangement* arrs,
+                                                            Steinberg::int32 num)
+            {
+                for (Steinberg::int32 i = 0; i < num; ++i)
+                {
+                    Vst::SpeakerArrangement current{};
+
+                    if (getBusArrangement (dir, i, current) != kResultTrue || current != arrs[i])
+                        return false;
+                }
+
+                return true;
+            };
+
+            if (matchesCurrentArrangements (Vst::kInput,  inputs,  numIns)
+                && matchesCurrentArrangements (Vst::kOutput, outputs, numOuts))
+                return kResultTrue;
+
+            // The host is misbehaving! The plugin must be deactivated before setting new arrangements.
+            jassertfalse;
+            return kResultFalse;
+        }
 
         // see the following documentation to understand the correct way to react to this callback
         // https://steinbergmedia.github.io/vst3_doc/vstinterfaces/classSteinberg_1_1Vst_1_1IAudioProcessor.html#ad3bc7bac3fd3b194122669be2a1ecc42
