@@ -417,19 +417,25 @@ class ScopedThreadDPIAwarenessSetter::NativeImpl
 {
 public:
     explicit NativeImpl (HWND nativeWindow [[maybe_unused]])
+        : oldContext (std::invoke ([&]() -> DPI_AWARENESS_CONTEXT
+          {
+             #if JUCE_WIN_PER_MONITOR_DPI_AWARE
+              auto dpiAwareWindow = (GetAwarenessFromDpiAwarenessContext (GetWindowDpiAwarenessContext (nativeWindow))
+                                     == DPI_AWARENESS_PER_MONITOR_AWARE);
+
+              auto dpiAwareThread = (GetAwarenessFromDpiAwarenessContext (GetThreadDpiAwarenessContext())
+                                     == DPI_AWARENESS_PER_MONITOR_AWARE);
+
+              if (dpiAwareWindow && ! dpiAwareThread)
+                  return SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
+              if (! dpiAwareWindow && dpiAwareThread)
+                  return SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
+             #endif
+
+              return nullptr;
+          }))
     {
-       #if JUCE_WIN_PER_MONITOR_DPI_AWARE
-        auto dpiAwareWindow = (GetAwarenessFromDpiAwarenessContext (GetWindowDpiAwarenessContext (nativeWindow))
-                               == DPI_AWARENESS_PER_MONITOR_AWARE);
-
-        auto dpiAwareThread = (GetAwarenessFromDpiAwarenessContext (GetThreadDpiAwarenessContext())
-                               == DPI_AWARENESS_PER_MONITOR_AWARE);
-
-        if (dpiAwareWindow && ! dpiAwareThread)
-            oldContext = SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-        else if (! dpiAwareWindow && dpiAwareThread)
-            oldContext = SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
-       #endif
     }
 
     ~NativeImpl()

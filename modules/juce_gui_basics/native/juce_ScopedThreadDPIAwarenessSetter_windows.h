@@ -44,8 +44,9 @@ public:
     ScopedThreadDPIAwarenessSetter& operator= (ScopedThreadDPIAwarenessSetter&&) noexcept;
     ~ScopedThreadDPIAwarenessSetter();
 
-private:
     class NativeImpl;
+
+private:
     std::unique_ptr<NativeImpl> pimpl;
 
     JUCE_LEAK_DETECTOR (ScopedThreadDPIAwarenessSetter)
