@@ -821,7 +821,8 @@ public:
     ~PlatformSpecificHandle()
     {
         if (cursorHandle != Cursor{})
-            XWindowSystem::getInstance()->deleteMouseCursor (cursorHandle);
+            if (auto* windowSystem = XWindowSystem::getInstanceWithoutCreating())
+                windowSystem->deleteMouseCursor (cursorHandle);
     }
 
     static void showInWindow (PlatformSpecificHandle* handle, ComponentPeer* peer)
