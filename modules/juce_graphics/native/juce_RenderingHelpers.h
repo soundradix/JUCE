@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -1199,6 +1215,15 @@ namespace EdgeTableFillers
                 : addBytesToPointer (linePixels, x * destData.pixelStride);
         }
 
+        static forcedinline void storeNativeARGB (void* dest, const uint32 (&c)[4], int shiftAmount) noexcept
+        {
+            auto* d = static_cast<uint8*> (dest);
+            d[0] = (uint8) (c[0] >> shiftAmount);
+            d[1] = (uint8) (c[1] >> shiftAmount);
+            d[2] = (uint8) (c[2] >> shiftAmount);
+            d[3] = (uint8) (c[3] >> shiftAmount);
+        }
+
         //==============================================================================
         template <class PixelType>
         void generate (PixelType* dest, int x, int numPixels) noexcept
@@ -1309,10 +1334,7 @@ namespace EdgeTableFillers
             c[2] += weight * src[2];
             c[3] += weight * src[3];
 
-            dest->setARGB ((uint8) (c[PixelARGB::indexA] >> 16),
-                           (uint8) (c[PixelARGB::indexR] >> 16),
-                           (uint8) (c[PixelARGB::indexG] >> 16),
-                           (uint8) (c[PixelARGB::indexB] >> 16));
+            storeNativeARGB (dest, c, 16);
         }
 
         void render2PixelAverageX (PixelARGB* dest, const uint8* src, uint32 subPixelX) noexcept
@@ -1333,10 +1355,7 @@ namespace EdgeTableFillers
             c[2] += weight * src[2];
             c[3] += weight * src[3];
 
-            dest->setARGB ((uint8) (c[PixelARGB::indexA] >> 8),
-                           (uint8) (c[PixelARGB::indexR] >> 8),
-                           (uint8) (c[PixelARGB::indexG] >> 8),
-                           (uint8) (c[PixelARGB::indexB] >> 8));
+            storeNativeARGB (dest, c, 8);
         }
 
         void render2PixelAverageY (PixelARGB* dest, const uint8* src, uint32 subPixelY) noexcept
@@ -1357,10 +1376,7 @@ namespace EdgeTableFillers
             c[2] += weight * src[2];
             c[3] += weight * src[3];
 
-            dest->setARGB ((uint8) (c[PixelARGB::indexA] >> 8),
-                           (uint8) (c[PixelARGB::indexR] >> 8),
-                           (uint8) (c[PixelARGB::indexG] >> 8),
-                           (uint8) (c[PixelARGB::indexB] >> 8));
+            storeNativeARGB (dest, c, 8);
         }
 
         //==============================================================================

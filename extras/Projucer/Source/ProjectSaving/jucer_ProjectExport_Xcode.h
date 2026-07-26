@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -198,6 +214,7 @@ public:
           embeddedFrameworksValue                      (settings, Ids::embeddedFrameworks,                      getUndoManager()),
           postbuildCommandValue                        (settings, Ids::postbuildCommand,                        getUndoManager()),
           prebuildCommandValue                         (settings, Ids::prebuildCommand,                         getUndoManager()),
+          postSignCommandValue                         (settings, Ids::postSignCommand,                         getUndoManager()),
           duplicateAppExResourcesFolderValue           (settings, Ids::duplicateAppExResourcesFolder,           getUndoManager(), true),
           iosDeviceFamilyValue                         (settings, Ids::iosDeviceFamily,                         getUndoManager(), "1,2"),
           iPhoneScreenOrientationValue                 (settings, Ids::iPhoneScreenOrientation,                 getUndoManager(), getDefaultScreenOrientations(), ","),
@@ -294,6 +311,7 @@ public:
 
     String getPostBuildScript() const                       { return postbuildCommandValue.get(); }
     String getPreBuildScript() const                        { return prebuildCommandValue.get(); }
+    String getPostSignScript() const                        { return postSignCommandValue.get(); }
 
     bool shouldDuplicateAppExResourcesFolder() const        { return duplicateAppExResourcesFolderValue.get(); }
 
@@ -867,6 +885,9 @@ public:
 
         props.add (new TextPropertyComponent (postbuildCommandValue, "Post-Build Shell Script", 32768, true),
                    "Some shell-script that will be run after a build completes.");
+
+        props.add (new TextPropertyComponent (postSignCommandValue, "Post-Sign Shell Script", 32768, true),
+                   "Some shell-script that will be run after a build completes and the product has been signed.");
 
         props.add (new TextPropertyComponent (exporterBundleIdentifierValue, "Exporter Bundle Identifier", 256, false),
                    "Use this to override the project bundle identifier for this exporter. "
@@ -2645,7 +2666,7 @@ private:
     {
         const auto runPreBuildScript = [&]
         {
-            target.addShellScriptBuildPhase ("Pre-build script", getPreBuildScript());
+            target.addShellScriptBuildPhase ("Run Pre-Build Script", getPreBuildScript());
         };
 
         const auto copyBundleResources = [&]
@@ -2707,7 +2728,12 @@ private:
 
         const auto runPostBuildScript = [&]
         {
-            target.addShellScriptBuildPhase ("Run Post-build Script", getPostBuildScript());
+            target.addShellScriptBuildPhase ("Run Post-Build Script", getPostBuildScript());
+        };
+
+        const auto runPostSignScript = [&]
+        {
+            target.addShellScriptBuildPhase ("Run Post-Sign Script", getPostSignScript());
         };
 
         const auto embedAUv3AppExtension = [&]
@@ -2866,6 +2892,8 @@ private:
             {
                 signTarget();
             }
+
+            runPostSignScript();
 
             if (target.xcodeCopyToProductInstallPathAfterBuild)
                 installTarget();
@@ -4388,7 +4416,7 @@ private:
                                  subprojectsValue,
                                  validArchsValue,
                                  extraFrameworksValue, frameworkSearchPathsValue, extraCustomFrameworksValue, embeddedFrameworksValue,
-                                 postbuildCommandValue, prebuildCommandValue,
+                                 postbuildCommandValue, prebuildCommandValue, postSignCommandValue,
                                  duplicateAppExResourcesFolderValue, iosDeviceFamilyValue, iPhoneScreenOrientationValue,
                                  iPadScreenOrientationValue, iconComposerIconValue, customXcodeResourceFoldersValue, customXcassetsFolderValue,
                                  appSandboxValue, appSandboxInheritanceValue, appSandboxOptionsValue,

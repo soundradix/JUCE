@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -122,6 +138,44 @@ public:
         support additional values for specific behaviors.
     */
     uint32 value;
+};
+
+/** Represents a single OpenType variable font setting.
+
+    This allows for precise typographic control, enabling smooth transitions
+    between different font styles without requiring separate font files for
+    each variation.
+
+    Supported settings and ranges can be queried with Typeface::getSupportedVariables.
+
+    @see FontFeatureTag, FontOptions, Font, Typeface
+
+    @tags{Graphics}
+*/
+class JUCE_API FontVariableSetting final
+{
+    constexpr auto tie() const;
+
+public:
+    /** Constructs a variable font setting with the specified variable tag and value. */
+    constexpr FontVariableSetting (FontFeatureTag variableTag, float variableValue) noexcept
+        : tag (variableTag),
+          value (variableValue)
+    {
+    }
+
+    [[nodiscard]] constexpr bool operator<  (const FontVariableSetting& other) const;
+    [[nodiscard]] constexpr bool operator<= (const FontVariableSetting& other) const;
+    [[nodiscard]] constexpr bool operator>  (const FontVariableSetting& other) const;
+    [[nodiscard]] constexpr bool operator>= (const FontVariableSetting& other) const;
+    [[nodiscard]] constexpr bool operator!= (const FontVariableSetting& other) const;
+    [[nodiscard]] constexpr bool operator== (const FontVariableSetting& other) const;
+
+    /** The OpenType variation axis tag. */
+    FontFeatureTag tag;
+
+    /** The value for this axis. */
+    float value;
 };
 
 } // namespace juce

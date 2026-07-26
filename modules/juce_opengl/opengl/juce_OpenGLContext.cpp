@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -64,9 +80,21 @@ private:
 
 #endif
 
+static auto tieVersion (const OpenGLVersion& v)
+{
+    return std::tuple (v.major, v.minor);
+}
+
+bool OpenGLVersion::operator== (const OpenGLVersion& other) const { return tieVersion (*this) == tieVersion (other); }
+bool OpenGLVersion::operator!= (const OpenGLVersion& other) const { return tieVersion (*this) != tieVersion (other); }
+bool OpenGLVersion::operator<  (const OpenGLVersion& other) const { return tieVersion (*this) <  tieVersion (other); }
+bool OpenGLVersion::operator<= (const OpenGLVersion& other) const { return tieVersion (*this) <= tieVersion (other); }
+bool OpenGLVersion::operator>  (const OpenGLVersion& other) const { return tieVersion (*this) >  tieVersion (other); }
+bool OpenGLVersion::operator>= (const OpenGLVersion& other) const { return tieVersion (*this) >= tieVersion (other); }
+
 static bool contextHasTextureNpotFeature()
 {
-    if (getOpenGLVersion() >= Version (2))
+    if (getOpenGLVersion() >= OpenGLVersion (2))
         return true;
 
     // If the version is < 2, we can't use the newer extension-checking API
@@ -132,8 +160,13 @@ public:
         : context (c),
           component (comp)
     {
-        nativeContext.reset (new NativeContext (component, pixFormat, contextToShare,
-                                                c.useMultisampling, c.versionRequired));
+        nativeContext.reset (new NativeContext (component,
+                                                pixFormat,
+                                                contextToShare,
+                                                c.useMultisampling,
+                                                c.preferredAPI,
+                                                c.preferredVersion,
+                                                c.preferredProfile));
 
         if (nativeContext->createdOk())
             context.nativeContext = nativeContext.get();
@@ -189,6 +222,10 @@ public:
 
         if (context.renderer != nullptr)
             context.renderer->openGLContextClosing();
+
+        context.actualAPI = {};
+        context.actualVersion = {};
+        context.actualProfile = {};
 
         associatedObjectNames.clear();
         associatedObjects.clear();
@@ -298,7 +335,7 @@ public:
         ~ScopedContextActivator()
         {
             if (active)
-                OpenGLContext::deactivateCurrentContext();
+                deactivateCurrentContext();
         }
 
     private:
@@ -486,7 +523,9 @@ public:
                 transform = AffineTransform::scale ((float) newArea.getWidth()  / (float) localBounds.getWidth(),
                                                     (float) newArea.getHeight() / (float) localBounds.getHeight());
 
-                nativeContext->updateWindowPosition();
+                if (nativeContext != nullptr)
+                    nativeContext->updateWindowPosition();
+
                 invalidateAll();
             });
         }
@@ -536,7 +575,7 @@ public:
 
     void drawComponentBuffer()
     {
-        if (! OpenGLRendering::TraitsVAO::isCoreProfile())
+        if (context.actualProfile == OpenGLProfile::compatibility)
             glEnable (GL_TEXTURE_2D);
 
        #if JUCE_WINDOWS
@@ -649,11 +688,20 @@ public:
 
         nativeContext->setSwapInterval (1);
 
-       #if ! JUCE_OPENGL_ES
-        JUCE_CHECK_OPENGL_ERROR
-        shadersAvailable = OpenGLShaderProgram::getLanguageVersion() > 0;
-        clearGLError();
-       #endif
+        context.actualAPI = OpenGLHelpers::isOpenGLES() ? OpenGLAPI::openGLES : OpenGLAPI::openGL;
+        context.actualVersion = getOpenGLVersion();
+        context.actualProfile = getOpenGLProfile();
+
+        if (context.actualAPI == OpenGLAPI::openGL)
+        {
+            JUCE_CHECK_OPENGL_ERROR
+            shadersAvailable = OpenGLShaderProgram::getLanguageVersion() > 0;
+            clearGLError();
+        }
+        else
+        {
+            shadersAvailable = true;
+        }
 
         textureNpotSupported = contextHasTextureNpotFeature();
 
@@ -668,9 +716,9 @@ public:
     }
 
     //==============================================================================
-    struct BlockingWorker final : public OpenGLContext::AsyncWorker
+    struct BlockingWorker final : public AsyncWorker
     {
-        BlockingWorker (OpenGLContext::AsyncWorker::Ptr && workerToUse)
+        BlockingWorker (Ptr && workerToUse)
             : originalWorker (std::move (workerToUse))
         {}
 
@@ -684,7 +732,7 @@ public:
 
         void block() noexcept  { finishedSignal.wait(); }
 
-        OpenGLContext::AsyncWorker::Ptr originalWorker;
+        Ptr originalWorker;
         WaitableEvent finishedSignal;
     };
 
@@ -702,14 +750,14 @@ public:
         }
     }
 
-    void execute (OpenGLContext::AsyncWorker::Ptr workerToUse, bool shouldBlock)
+    void execute (AsyncWorker::Ptr workerToUse, bool shouldBlock)
     {
         if (! isFlagSet (state, StateFlags::pendingDestruction))
         {
             if (shouldBlock)
             {
                 auto blocker = new BlockingWorker (std::move (workerToUse));
-                OpenGLContext::AsyncWorker::Ptr worker (*blocker);
+                AsyncWorker::Ptr worker (*blocker);
                 workQueue.add (worker);
 
                 renderThread->abortLock();
@@ -969,11 +1017,7 @@ public:
     ReferenceCountedArray<ReferenceCountedObject> associatedObjects;
 
     WaitableEvent canPaintNowFlag, finishedPaintingFlag;
-   #if JUCE_OPENGL_ES
-    bool shadersAvailable = true;
-   #else
     bool shadersAvailable = false;
-   #endif
     bool textureNpotSupported = false;
     std::chrono::steady_clock::time_point lastMMLockReleaseTime{};
     BufferSwapper bufferSwapper { *this };
@@ -1060,7 +1104,7 @@ public:
     };
 
     std::atomic<int> state { 0 };
-    ReferenceCountedArray<OpenGLContext::AsyncWorker, CriticalSection> workQueue;
+    ReferenceCountedArray<AsyncWorker, CriticalSection> workQueue;
 
    #if JUCE_IOS
     iOSBackgroundProcessCheck backgroundProcessCheck;
@@ -1108,7 +1152,8 @@ public:
             if (auto* c = CachedImage::get (comp))
                 c->handleResize();
 
-            context.nativeContext->updateWindowPosition();
+            if (auto* native = context.nativeContext)
+                native->updateWindowPosition();
         }
     }
 
@@ -1305,7 +1350,76 @@ void OpenGLContext::setMultisamplingEnabled (bool b) noexcept
 
 void OpenGLContext::setOpenGLVersionRequired (OpenGLVersion v) noexcept
 {
-    versionRequired = v;
+    setPreferredVersion (std::invoke ([&]() -> Version
+    {
+        switch (v)
+        {
+            case defaultGLVersion: return {};
+            case openGL3_2: return { 3, 2 };
+            case openGL4_1: return { 4, 1 };
+            case openGL4_3: return { 4, 3 };
+        }
+
+        return {};
+    }));
+
+    setPreferredProfile (std::invoke ([&]() -> Profile
+    {
+        switch (v)
+        {
+            case defaultGLVersion: return OpenGLProfile::compatibility;
+            case openGL3_2: return OpenGLProfile::core;
+            case openGL4_1: return OpenGLProfile::core;
+            case openGL4_3: return OpenGLProfile::core;
+        }
+
+        return OpenGLProfile::core;
+    }));
+}
+
+void OpenGLContext::setPreferredVersion (const Version& v)
+{
+    preferredVersion = v;
+}
+
+auto OpenGLContext::getPreferredVersion() const -> Version
+{
+    return preferredVersion;
+}
+
+auto OpenGLContext::getVersion() const -> Version
+{
+    return actualVersion;
+}
+
+void OpenGLContext::setPreferredAPI (API x)
+{
+    preferredAPI = x;
+}
+
+auto OpenGLContext::getPreferredAPI() const -> API
+{
+    return preferredAPI;
+}
+
+auto OpenGLContext::getAPI() const -> API
+{
+    return actualAPI;
+}
+
+void OpenGLContext::setPreferredProfile (Profile x)
+{
+    preferredProfile = x;
+}
+
+auto OpenGLContext::getPreferredProfile() const -> Profile
+{
+    return preferredProfile;
+}
+
+auto OpenGLContext::getProfile() const -> Profile
+{
+    return actualProfile;
 }
 
 void OpenGLContext::attachTo (Component& component)
@@ -1414,8 +1528,7 @@ void* OpenGLContext::getRawContext() const noexcept
 
 bool OpenGLContext::isCoreProfile() const
 {
-    auto* c = getCachedImage();
-    return c != nullptr && OpenGLRendering::TraitsVAO::isCoreProfile();
+    return getProfile() == OpenGLProfile::core;
 }
 
 OpenGLContext::CachedImage* OpenGLContext::getCachedImage() const noexcept
@@ -1568,27 +1681,27 @@ void OpenGLContext::copyTexture (const Rectangle<int>& targetClipArea,
                 explicit BuiltProgram (OpenGLContext& ctx)
                     : OpenGLShaderProgram (ctx)
                 {
-                    addVertexShader (OpenGLHelpers::translateVertexShaderToV3 (
-                        "attribute " JUCE_HIGHP " vec2 position;"
-                        "uniform " JUCE_HIGHP " vec2 screenSize;"
-                        "uniform " JUCE_HIGHP " float textureBounds[4];"
-                        "uniform " JUCE_HIGHP " vec2 vOffsetAndScale;"
-                        "varying " JUCE_HIGHP " vec2 texturePos;"
+                    addVertexShader (OpenGLHelpers::translateVertexShaderToV3 (preprocessShaderPrecisionStatements (
+                        "attribute #highp# vec2 position;"
+                        "uniform #highp# vec2 screenSize;"
+                        "uniform #highp# float textureBounds[4];"
+                        "uniform #highp# vec2 vOffsetAndScale;"
+                        "varying #highp# vec2 texturePos;"
                         "void main()"
                         "{"
-                          JUCE_HIGHP " vec2 scaled = position / (0.5 * screenSize.xy);"
+                          "#highp# vec2 scaled = position / (0.5 * screenSize.xy);"
                           "gl_Position = vec4 (scaled.x - 1.0, 1.0 - scaled.y, 0, 1.0);"
                           "texturePos = (position - vec2 (textureBounds[0], textureBounds[1])) / vec2 (textureBounds[2], textureBounds[3]);"
                           "texturePos = vec2 (texturePos.x, vOffsetAndScale.x + vOffsetAndScale.y * texturePos.y);"
-                        "}"));
+                        "}")));
 
-                    addFragmentShader (OpenGLHelpers::translateFragmentShaderToV3 (
+                    addFragmentShader (OpenGLHelpers::translateFragmentShaderToV3 (preprocessShaderPrecisionStatements (
                         "uniform sampler2D imageTexture;"
-                        "varying " JUCE_HIGHP " vec2 texturePos;"
+                        "varying #highp# vec2 texturePos;"
                         "void main()"
                         "{"
                           "gl_FragColor = texture2D (imageTexture, texturePos);"
-                        "}"));
+                        "}")));
 
                     link();
                 }
@@ -1699,13 +1812,11 @@ void OpenGLContext::NativeContext::surfaceCreated (LocalRef<jobject> holder)
         surface.reset();
 
         // Create the surface
-        surface.reset (eglCreateWindowSurface (display, config, window.get(), nullptr));
-        jassert (surface.get() != EGL_NO_SURFACE);
+        surface = { eglCreateWindowSurface (display, config, window.get(), nullptr), display };
+        jassert (surface != nullptr);
 
-        // create the OpenGL context
-        EGLint contextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-        context.reset (eglCreateContext (display, config, EGL_NO_CONTEXT, contextAttribs));
-        jassert (context.get() != EGL_NO_CONTEXT);
+        context = EGLHelpers::initEGLContext (api, version, profile, display, config, EGL_NO_CONTEXT);
+        jassert (context != nullptr);
     }
 
     if (auto* cached = CachedImage::get (component))
@@ -1723,8 +1834,8 @@ void OpenGLContext::NativeContext::surfaceDestroyed (LocalRef<jobject>)
     {
         const std::lock_guard lock { nativeHandleMutex };
 
-        context.reset (EGL_NO_CONTEXT);
-        surface.reset (EGL_NO_SURFACE);
+        context.reset();
+        surface.reset();
     }
 }
 

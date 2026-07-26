@@ -1,13 +1,12 @@
-The files in this directory are from the FLAC 1.4.3 release downloaded in a tarball from
-https://github.com/xiph/flac/releases/tag/1.4.3
+The files in this directory are from the FLAC 1.5.0 release downloaded in a tarball from
+https://github.com/xiph/flac/releases/tag/1.5.0
 
 They have been modified as little as possible, so that when they are included by
-juce_FlacAudioFormat.cpp they compile without warnings and work correctly on the supported
-platforms.
+JUCE they compile without warnings and work correctly on the supported platforms.
 
 Below I will refer to the contents of the tarball as RELEASE and to our repo as JUCE.
 
-The steps carried out when including the 1.4.3 version
+The steps carried out when including the 1.5.0 version
 * The contents of RELEASE/include/FLAC and RELEASE/include/share were copied to
   JUCE/[..]/codecs/flac
 * The contents of RELEASE/libFLAC were copied to JUCE/[..]/codecs/flac/libFLAC
@@ -17,12 +16,14 @@ The steps carried out when including the 1.4.3 version
   done per-line with a Python script. All the rules used for the retargeting can be seen in the code
   excerpt at [1].
 * Then I will do a compile/test/modify loop, until it works and compiles without warnings. The
-  changes made are mostly C to C++ conversions like adding explicit casts, or fixing warnings, like
-  eliminating always true branches that refer to preprocessor defines.
+  changes made are mostly suppressing warnings.
 * Then I delete all library files, and only re-add those that are needed for successful compilation.
   This delete step is propagated back to older commits, so that unneeded files are never added to
   the GIT repo.
 
+In order to get the lpc_intrin_neon.c file to build with MSVC, a new function
+'FLAC__build_int32x4_t' was added, and all braced initialisations of int32x4_t types were switched
+to use the new function instead.
 
 [1]: Code excerpt used for retargeting includes in the copied files
 ```

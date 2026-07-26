@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -94,6 +110,11 @@ static const uint8 javaJuceOpenGLView[] =
     0x05, 0x00, 0x00
 };
 
+bool OpenGLHelpers::isOpenGLES()
+{
+    return eglQueryAPI() == EGL_OPENGL_ES_API;
+}
+
 //==============================================================================
 //==============================================================================
 class OpenGLContext::NativeContext : private SurfaceHolderCallback
@@ -103,8 +124,13 @@ public:
                    const OpenGLPixelFormat& pixelFormat,
                    void* /*contextToShareWith*/,
                    bool useMultisamplingIn,
-                   OpenGLVersion)
-        : component (comp)
+                   API apiIn,
+                   Version versionIn,
+                   Profile profileIn)
+        : component (comp),
+          api (apiIn),
+          version (versionIn),
+          profile (profileIn)
     {
         auto env = getEnv();
 
@@ -287,11 +313,11 @@ private:
             t.juceContext->triggerRepaint();
     }
 
-    bool tryChooseConfig (const std::vector<EGLint>& optionalAttribs)
+    bool tryChooseConfig (Span<const EGLint> optionalAttribs)
     {
         std::vector<EGLint> allAttribs
         {
-            EGL_RENDERABLE_TYPE,    EGL_OPENGL_ES2_BIT,
+            EGL_RENDERABLE_TYPE,    api == OpenGLAPI::openGLES ? EGL_OPENGL_ES2_BIT : EGL_OPENGL_BIT,
             EGL_SURFACE_TYPE,       EGL_WINDOW_BIT,
             EGL_BLUE_SIZE,          8,
             EGL_GREEN_SIZE,         8,
@@ -311,6 +337,10 @@ private:
     //==============================================================================
     bool initEGLDisplay (const OpenGLPixelFormat& pixelFormat, bool multisample)
     {
+        [[maybe_unused]] const auto didBind = eglBindAPI (api == OpenGLAPI::openGL ? EGL_OPENGL_API : EGL_OPENGL_ES_API);
+        // Failed to bind the requested OpenGL API
+        jassert (didBind);
+
         // already initialised?
         if (display != EGL_NO_DISPLAY)
             return true;
@@ -327,11 +357,17 @@ private:
             return false;
         }
 
-        if (tryChooseConfig ({ EGL_SAMPLE_BUFFERS, multisample ? 1 : 0, EGL_SAMPLES, pixelFormat.multisamplingLevel }))
-            return true;
+        const EGLint optionalFlags[]
+        {
+            EGL_SAMPLE_BUFFERS, multisample ? 1 : 0,
+            EGL_SAMPLES, pixelFormat.multisamplingLevel
+        };
 
-        if (tryChooseConfig ({}))
-            return true;
+        for (const auto& num : { 4, 0 })
+        {
+            if (tryChooseConfig (Span { optionalFlags, (size_t) num }))
+                return true;
+        }
 
         eglTerminate (display);
         jassertfalse;
@@ -389,23 +425,17 @@ private:
     GlobalRef surfaceView;
     Rectangle<int> physicalBounds;
 
-    struct SurfaceDestructor
-    {
-        void operator() (EGLSurface x) const { if (x != EGL_NO_SURFACE) eglDestroySurface (display, x); }
-    };
-
-    struct ContextDestructor
-    {
-        void operator() (EGLContext x) const { if (x != EGL_NO_CONTEXT) eglDestroyContext (display, x); }
-    };
-
     mutable std::mutex nativeHandleMutex;
     OpenGLContext* juceContext = nullptr;
     ListenerList<NativeContextListener> listeners;
-    std::unique_ptr<std::remove_pointer_t<EGLSurface>, SurfaceDestructor> surface { EGL_NO_SURFACE };
-    std::unique_ptr<std::remove_pointer_t<EGLContext>, ContextDestructor> context { EGL_NO_CONTEXT };
+    EGLHelpers::PtrEGLSurface surface{};
+    EGLHelpers::PtrEGLContext context{};
 
     GlobalRef surfaceHolderCallback;
+
+    API api{};
+    Version version{};
+    Profile profile{};
 
     inline static EGLDisplay display = EGL_NO_DISPLAY;
     inline static EGLConfig config;

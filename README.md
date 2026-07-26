@@ -61,7 +61,7 @@ of the target you wish to build.
 
 #### Building JUCE Projects
 
-- __C++ Standard__: 17
+- __C++ Standard__: 17 (20 when building with JUCE_USE_WINDOWS_MIDI_SERVICES enabled)
 - __macOS/iOS__: Xcode 12.4 (Intel macOS 10.15.4, Apple Silicon macOS 11.0)
 - __Windows__: Visual Studio 2019 (Windows 10 version 1607)
 - __Linux__: g++ 7.0 or Clang 6.0 (for a full list of dependencies, see

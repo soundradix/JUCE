@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -20,6 +36,59 @@ namespace juce
 {
 
 class OpenGLTexture;
+
+/**
+    Denotes different kinds of OpenGL API that might be available.
+
+    In general, lower-power hardware (mobile devices) will have OpenGLES support, while
+    desktop-class hardware will have regular OpenGL support.
+
+    @tags{OpenGL}
+*/
+enum class OpenGLAPI
+{
+    openGL,     ///< Regular OpenGL (desktop)
+    openGLES,   ///< OpenGL ES (mobile)
+};
+
+/**
+    Denotes OpenGL profile kinds.
+
+    @tags{OpenGL}
+*/
+enum class OpenGLProfile
+{
+    compatibility,  ///< Context supports legacy/deprecated functionality
+    core,           ///< Context only supports core profile functionality
+};
+
+/**
+    Holds version information about a particular OpenGL API.
+
+    @tags{OpenGL}
+*/
+struct OpenGLVersion
+{
+    /** Default constructor, both fields are initialised to 0. */
+    OpenGLVersion() = default;
+
+    /** Initialises the major field only. */
+    explicit OpenGLVersion (int majorIn) : OpenGLVersion { majorIn, 0 } {}
+
+    /** Initialises the major and minor fields. */
+    OpenGLVersion (int majorIn, int minorIn) : major { majorIn }, minor { minorIn } {}
+
+    int major = 0; ///< Major version, i.e. the "4" in "4.3"
+    int minor = 0; ///< Minor version, i.e. the "3" in "4.3"
+
+    bool operator== (const OpenGLVersion&) const;
+    bool operator!= (const OpenGLVersion&) const;
+
+    bool operator<  (const OpenGLVersion&) const;
+    bool operator<= (const OpenGLVersion&) const;
+    bool operator>  (const OpenGLVersion&) const;
+    bool operator>= (const OpenGLVersion&) const;
+};
 
 //==============================================================================
 /**
@@ -147,7 +216,62 @@ public:
     /** Sets a preference for the version of GL that this context should use, if possible.
         Some platforms may ignore this value.
     */
+    [[deprecated ("Prefer the new function that accepts arbitrary major/minor versions")]]
     void setOpenGLVersionRequired (OpenGLVersion) noexcept;
+
+    using Version = juce::OpenGLVersion;
+
+    /** Sets the OpenGL API version that will be requested when the context is attached.
+
+        Platforms may ignore this request. Use getVersion() to determine the actual version that is
+        in use.
+
+        If you pass a Version with major and minor both set to 0, the platform will select its
+        default version, which will normally be a compatibility context.
+
+        Replaces setOpenGLVersionRequired().
+    */
+    void setPreferredVersion (const Version&);
+
+    /** Gets the OpenGL API version that will be requested when the context is attached. */
+    Version getPreferredVersion() const;
+
+    /** If the OpenGL context is attached, returns the API version of the context.
+        Avoid calling this while the context is detached.
+    */
+    Version getVersion() const;
+
+    using API = OpenGLAPI;
+
+    /** Sets the API that will be requested when the context is attached.
+
+        Platforms may ignore this request. Use getAPI() to determine the actual API that is in use.
+    */
+    void setPreferredAPI (API);
+
+    /** Gets the API that will be requested when the context is attached. */
+    API getPreferredAPI() const;
+
+    /** If the OpenGL context is attached, returns the API in use by the context.
+        Avoid calling this while the context is detached.
+    */
+    API getAPI() const;
+
+    using Profile = OpenGLProfile;
+
+    /** Sets the Profile that will be requested when the context is attached.
+
+        Platforms may ignore this request. Use getProfile() to determine the actual Profile that is in use.
+    */
+    void setPreferredProfile (Profile);
+
+    /** Gets the Profile that will be requested when the context is attached. */
+    Profile getPreferredProfile() const;
+
+    /** If the OpenGL context is attached, returns the Profile in use by the context.
+        Avoid calling this while the context is detached.
+    */
+    Profile getProfile() const;
 
     /** Enables or disables the use of the GL context to perform 2D rendering
         of the component to which it is attached.
@@ -294,6 +418,7 @@ public:
 
         @see OpenGLVersion
     */
+    [[deprecated ("Prefer getProfile()")]]
     bool isCoreProfile() const;
 
     /** This structure holds a set of dynamically loaded GL functions for use on this context. */
@@ -353,7 +478,21 @@ private:
     std::unique_ptr<Attachment> attachment;
     OpenGLPixelFormat openGLPixelFormat;
     void* contextToShareWith = nullptr;
-    OpenGLVersion versionRequired = defaultGLVersion;
+    Version preferredVersion{}, actualVersion{};
+    API preferredAPI =
+       #if JUCE_OPENGL_ES
+        API::openGLES
+       #else
+        API::openGL
+       #endif
+    , actualAPI{};
+    Profile preferredProfile =
+       #if JUCE_OPENGL_ES
+        Profile::core
+       #else
+        Profile::compatibility
+       #endif
+    , actualProfile{};
     size_t imageCacheMaxSize = 8 * 1024 * 1024;
     bool renderComponents = true, useMultisampling = false, overrideCanAttach = false;
     std::atomic<bool> continuousRepaint { false };

@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -98,6 +114,7 @@
  #endif
 #elif JUCE_ANDROID
  #include <android/font_matcher.h>
+ #include <android/system_fonts.h>
 #endif
 
 #if JUCE_USE_FREETYPE
@@ -105,6 +122,7 @@
  #include FT_FREETYPE_H
  #include FT_ADVANCES_H
  #include FT_TRUETYPE_TABLES_H
+ #include FT_MULTIPLE_MASTERS_H
  #include FT_GLYPH_H
 
  #ifdef FT_COLOR_H
@@ -180,6 +198,7 @@ extern "C"
 #include "image_formats/juce_JPEGLoader.cpp"
 #include "image_formats/juce_PNGLoader.cpp"
 #include "fonts/juce_AttributedString.cpp"
+#include "fonts/juce_FontComparators.h"
 #include "fonts/juce_Typeface.cpp"
 #include "fonts/juce_FontFeatures.cpp"
 #include "fonts/juce_FontOptions.cpp"
@@ -193,6 +212,67 @@ extern "C"
 #include "fonts/juce_TextLayout.cpp"
 #include "effects/juce_DropShadowEffect.cpp"
 #include "effects/juce_GlowEffect.cpp"
+
+
+#include "drawables/juce_StrokeOptions.cpp"
+#include "drawables/juce_Drawable.cpp"
+#include "drawables/juce_DrawableComposite.cpp"
+#include "drawables/juce_DrawableImage.cpp"
+#include "drawables/juce_DrawablePath.cpp"
+#include "drawables/juce_DrawableRectangle.cpp"
+#include "drawables/juce_DrawableShape.cpp"
+#include "drawables/juce_DrawableText.cpp"
+
+#include "detail/juce_LunaSvgFontReplacement.cpp"
+
+// A project may be linking against lunasvg in which case this may already be defined on the command-line
+#ifndef LUNASVG_BUILD
+ #define LUNASVG_BUILD
+#endif
+#ifndef LUNASVG_BUILD_STATIC
+ #define LUNASVG_BUILD_STATIC
+#endif
+#define JUCE_PLUTOVG_BUILD
+#define JUCE_PLUTOVG_BUILD_STATIC
+
+JUCE_BEGIN_IGNORE_WARNINGS_MSVC (4100 4244 4267 6323)
+JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-Wfloat-conversion",
+                                     "-Wfloat-equal",
+                                     "-Wmissing-field-initializers",
+                                     "-Wshadow-field-in-constructor",
+                                     "-Wshadow-uncaptured-local",
+                                     "-Wshorten-64-to-32",
+                                     "-Wsign-conversion",
+                                     "-Wswitch-enum",
+                                     "-Wunused-parameter",
+                                     "-Wimplicit-int-float-conversion",
+                                     "-Wshadow",
+                                     "-Wunused-function",
+                                     "-Wignored-qualifiers")
+
+#include "drawables/lunasvg/include/lunasvg.h"
+#include "drawables/lunasvg/source/graphics.h"
+
+#include "drawables/lunasvg/source/graphics.cpp"
+#include "drawables/lunasvg/source/lunasvg.cpp"
+#include "drawables/lunasvg/source/svgelement.cpp"
+#include "drawables/lunasvg/source/svggeometryelement.cpp"
+#include "drawables/lunasvg/source/svglayoutstate.cpp"
+#include "drawables/lunasvg/source/svgpaintelement.cpp"
+#include "drawables/lunasvg/source/svgparser.cpp"
+#include "drawables/lunasvg/source/svgproperty.cpp"
+#include "drawables/lunasvg/source/svgrenderstate.cpp"
+#include "drawables/lunasvg/source/svgtextelement.cpp"
+
+JUCE_END_IGNORE_WARNINGS_GCC_LIKE
+JUCE_END_IGNORE_WARNINGS_MSVC
+
+#undef JUCE_PLUTOVG_BUILD_STATIC
+#undef JUCE_PLUTOVG_BUILD
+#undef LUNASVG_BUILD_STATIC
+#undef LUNASVG_BUILD
+
+#include "drawables/juce_SVGParser.cpp"
 
 #if JUCE_UNIT_TESTS
  #include "geometry/juce_Parallelogram_test.cpp"

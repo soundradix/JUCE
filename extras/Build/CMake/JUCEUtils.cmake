@@ -1,16 +1,32 @@
 # ==============================================================================
 #
-#  This file is part of the JUCE 9 preview.
+#  This file is part of the JUCE framework.
 #  Copyright (c) Raw Material Software Limited
 #
-#  You may use this code under the terms of the AGPLv3
-#  (see www.gnu.org/licenses).
+#  JUCE is an open source framework subject to commercial or open source
+#  licensing.
 #
-#  For the JUCE 9 preview this file cannot be licensed commercially.
+#  By downloading, installing, or using the JUCE framework, or combining the
+#  JUCE framework with any other source code, object code, content or any other
+#  copyrightable work, you agree to the terms of the JUCE End User Licence
+#  Agreement, and all incorporated terms including the JUCE Privacy Policy and
+#  the JUCE Website Terms of Service, as applicable, which will bind you. If you
+#  do not agree to the terms of these agreements, we will not license the JUCE
+#  framework to you, and you must discontinue the installation or download
+#  process and cease use of the JUCE framework.
 #
-#  JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-#  EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-#  DISCLAIMED.
+#  JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+#  JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+#  JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+#
+#  Or:
+#
+#  You may also use this code under the terms of the AGPLv3:
+#  https://www.gnu.org/licenses/agpl-3.0.en.html
+#
+#  THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+#  WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+#  MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 #
 # ==============================================================================
 
@@ -387,6 +403,7 @@ function(_juce_write_configure_time_info target)
     _juce_append_target_property(file_content PLUGIN_DESCRIPTION                   ${target} JUCE_DESCRIPTION)
     _juce_append_target_property(file_content PLUGIN_AU_EXPORT_PREFIX              ${target} JUCE_AU_EXPORT_PREFIX)
     _juce_append_target_property(file_content PLUGIN_AU_MAIN_TYPE                  ${target} JUCE_AU_MAIN_TYPE_CODE)
+    _juce_append_target_property(file_content PLUGIN_AU_FRAMEWORK_BUNDLE_ID        ${target} JUCE_AU_FRAMEWORK_BUNDLE_ID)
     _juce_append_target_property(file_content IS_AU_SANDBOX_SAFE                   ${target} JUCE_AU_SANDBOX_SAFE)
     _juce_append_target_property(file_content IS_PLUGIN_SYNTH                      ${target} JUCE_IS_SYNTH)
     _juce_append_target_property(file_content IS_PLUGIN_ARA_EFFECT                 ${target} JUCE_IS_ARA_EFFECT)
@@ -1437,8 +1454,22 @@ function(_juce_link_plugin_wrapper shared_code_target kind)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "Android")
         add_library(${target_name} SHARED)
-    elseif((kind STREQUAL "Standalone") OR (kind STREQUAL "AUv3"))
+    elseif(kind STREQUAL "Standalone")
         add_executable(${target_name} WIN32 MACOSX_BUNDLE)
+    elseif(kind STREQUAL "AUv3")
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            add_library(${target_name}_Framework SHARED)
+            get_target_property(framework_bundle_id ${shared_code_target} JUCE_AU_FRAMEWORK_BUNDLE_ID)
+            set_target_properties(${target_name}_Framework PROPERTIES
+                FRAMEWORK TRUE
+                MACOSX_FRAMEWORK_IDENTIFIER ${framework_bundle_id})
+            add_executable(${target_name} MACOSX_BUNDLE)
+            target_link_libraries(${target_name} PRIVATE ${target_name}_Framework)
+            target_sources(${target_name} PRIVATE ${JUCE_CMAKE_UTILS_DIR}/bundleplaceholder.mm)
+            _juce_link_frameworks(${target_name} PUBLIC Foundation)
+        else()
+            add_executable(${target_name} MACOSX_BUNDLE)
+        endif()
     else()
         add_library(${target_name} MODULE)
     endif()
@@ -1453,9 +1484,18 @@ function(_juce_link_plugin_wrapper shared_code_target kind)
     target_include_directories(${target_name} PRIVATE
         $<TARGET_PROPERTY:${shared_code_target},INCLUDE_DIRECTORIES>)
 
-    target_link_libraries(${target_name} PRIVATE
-        ${shared_code_target}
-        juce::juce_audio_plugin_client_${kind})
+    if("${kind};${CMAKE_SYSTEM_NAME}" STREQUAL "AUv3;Darwin")
+        target_include_directories(${target_name}_Framework PRIVATE
+            $<TARGET_PROPERTY:${shared_code_target},INCLUDE_DIRECTORIES>)
+
+        target_link_libraries(${target_name}_Framework PRIVATE
+            ${shared_code_target}
+            juce::juce_audio_plugin_client_${kind})
+    else()
+        target_link_libraries(${target_name} PRIVATE
+            ${shared_code_target}
+            juce::juce_audio_plugin_client_${kind})
+    endif()
 
     _juce_set_output_name(${target_name} $<TARGET_PROPERTY:${shared_code_target},JUCE_PRODUCT_NAME>)
 
@@ -1647,6 +1687,11 @@ function(_juce_configure_plugin_targets target)
         add_dependencies(${target}_Standalone ${target}_AUv3)
         set_target_properties(${target}_Standalone PROPERTIES
             XCODE_EMBED_APP_EXTENSIONS ${target}_AUv3)
+
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            set_target_properties(${target}_Standalone PROPERTIES
+                XCODE_EMBED_FRAMEWORKS ${target}_AUv3_Framework)
+        endif()
     endif()
 
     get_target_property(wants_copy "${target}" JUCE_COPY_PLUGIN_AFTER_BUILD)
@@ -1803,6 +1848,7 @@ function(_juce_set_fallback_properties target)
 
     get_target_property(bundle_id ${target} JUCE_BUNDLE_ID)
     _juce_set_property_if_not_set(${target} AAX_IDENTIFIER ${bundle_id})
+    _juce_set_property_if_not_set(${target} AU_FRAMEWORK_BUNDLE_ID ${bundle_id}.internal)
 
     _juce_set_property_if_not_set(${target} VST_NUM_MIDI_INS 16)
     _juce_set_property_if_not_set(${target} VST_NUM_MIDI_OUTS 16)
@@ -2169,6 +2215,7 @@ function(_juce_initialise_target target)
     _juce_write_generate_time_info(${target})
     _juce_link_optional_libraries(${target})
     _juce_fixup_module_source_groups()
+    _juce_fixup_unity_property()
 endfunction()
 
 # ==================================================================================================

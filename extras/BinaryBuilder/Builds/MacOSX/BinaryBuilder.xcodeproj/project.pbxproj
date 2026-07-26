@@ -14,11 +14,13 @@
 		542006E949BB022F198DF0F2 /* RecentFilesMenuTemplate.nib */ = {isa = PBXBuildFile; fileRef = 1A71A586C0F50B6B328D877B; };
 		76329EF5627C14DD1C621F6E /* Security.framework */ = {isa = PBXBuildFile; fileRef = F9E4EBBA2682611A3978340C; };
 		9E4D85A3D54739A0FA80A446 /* include_juce_core.mm */ = {isa = PBXBuildFile; fileRef = D186E2D509765FAE0758F17D; };
+		BF4DAD95F43F213111571D0A /* include_juce_core_zlib.c */ = {isa = PBXBuildFile; fileRef = 050BE724CE378254371C5D83; };
 		C17566E1AACD033B3DD74E9F /* Foundation.framework */ = {isa = PBXBuildFile; fileRef = 6AA23C81496E022290EB2A0C; };
 		C72C2005E0871E7542A57DDA /* include_juce_core_CompilationTime.cpp */ = {isa = PBXBuildFile; fileRef = 85EE52F3EA830387CFC8BB96; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		050BE724CE378254371C5D83 /* include_juce_core_zlib.c */ /* include_juce_core_zlib.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = include_juce_core_zlib.c; path = ../../JuceLibraryCode/include_juce_core_zlib.c; sourceTree = SOURCE_ROOT; };
 		1A71A586C0F50B6B328D877B /* RecentFilesMenuTemplate.nib */ /* RecentFilesMenuTemplate.nib */ = {isa = PBXFileReference; lastKnownFileType = file.nib; name = RecentFilesMenuTemplate.nib; path = RecentFilesMenuTemplate.nib; sourceTree = SOURCE_ROOT; };
 		50B7C64414A3E778021F5EC4 /* Main.cpp */ /* Main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = Main.cpp; path = ../../Source/Main.cpp; sourceTree = SOURCE_ROOT; };
 		57DDB771ED96A256F190ADF8 /* Cocoa.framework */ /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = System/Library/Frameworks/Cocoa.framework; sourceTree = SDKROOT; };
@@ -76,6 +78,7 @@
 			children = (
 				D186E2D509765FAE0758F17D,
 				85EE52F3EA830387CFC8BB96,
+				050BE724CE378254371C5D83,
 				D6C3594C8BEC94040AF108FE,
 			);
 			name = "JUCE Library Code";
@@ -189,6 +192,7 @@
 				3C6FF7689E2FD827A48E2303,
 				9E4D85A3D54739A0FA80A446,
 				C72C2005E0871E7542A57DDA,
+				BF4DAD95F43F213111571D0A,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -213,7 +217,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"_DEBUG=1",
 					"DEBUG=1",
-					"JUCE_PROJUCER_VERSION=0x8000f",
+					"JUCE_PROJUCER_VERSION=0x90000",
 					"JUCE_MODULE_AVAILABLE_juce_core=1",
 					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
 					"JUCE_STANDALONE_APPLICATION=1",
@@ -317,7 +321,7 @@
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"_NDEBUG=1",
 					"NDEBUG=1",
-					"JUCE_PROJUCER_VERSION=0x8000f",
+					"JUCE_PROJUCER_VERSION=0x90000",
 					"JUCE_MODULE_AVAILABLE_juce_core=1",
 					"JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
 					"JUCE_STANDALONE_APPLICATION=1",

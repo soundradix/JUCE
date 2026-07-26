@@ -1,6 +1,128 @@
 # JUCE breaking changes
 
-# JUCE 9
+# develop
+
+## Change
+
+The WebBrowserComponent native integrations package location changed from
+modules/juce_gui_extra/native/javascript to
+modules/juce_gui_extra/native/typescript/webview-interop.
+
+**Possible Issues**
+
+Applications linking directly to the original in-source package location will
+fail to load the library.
+
+**Workaround**
+
+The package location should be upgraded to reflect the new in-source location.
+Alternatively, projects using a package manager can use the
+@juce-framework/webview package from npm.
+
+Javascript projects relying on the original index.js file can directly import
+webview-interop/dist/index.js instead.
+
+**Rationale**
+
+The WebBrowserComponent native integrations package has been translated to
+TypeScript and prepared to be published as a public npm package. This provides
+type information for projects consuming this package, but it imposes new
+requirements on the directory structure.
+
+
+# Version 9.0.0
+
+## Change
+
+Multi-touch is now disabled on Windows by default.
+
+**Possible Issues**
+
+Applications that rely on multi-touch input on Windows will no longer receive
+multi-touch events.
+
+**Workaround**
+
+To explicitly enable multi-touch support on Windows, call
+`TopLevelWindow::setUsingWindowsMultiTouch (true)` in desktop applications, or
+override `PluginEditor::usesWindowsMultiTouch()` in plugins and return `true`.
+
+**Rationale**
+
+Enabling multi-touch on Windows means the app cannot respond to built-in
+gestures, such as pinch-to-zoom. This is likely to be an unwanted default. The
+reason is that if `registerTouchWindow()` is called for an HWND its
+`DefWindowProc` will no longer emit gesture events. This means that `WM_GESTURE`
+messages aren't sent, and no callbacks will be made to
+e.g. `Component::mouseMagnify()`.
+
+
+## Change
+
+The function Drawable::createFromSVG (const XmlElement& svgDocument) has been
+removed.
+
+**Possible Issues**
+
+Code that calls the function will fail to compile.
+
+**Workaround**
+
+Use the createFromSVGFile() or createFromSVGString() functions instead.
+
+**Rationale**
+
+The SVG parsing features in JUCE have been fundamentally reworked, and they now
+depend on the lunasvg library. Lunasvg does its own XML parsing, and is not
+compatible with the juce::XmlElement type.
+
+
+## Change
+
+The return types of `DrawableShape::getStrokeType()` and
+`DrawableShape::getDashLengths()` changed from `const PathStrokeType&` to
+`PathStrokeType`, and from `const Array<float>&` to `Span<const float>`
+respectively. The parameter type to
+`DrawableShape::setDashLengths (const Array<float>&)` was changed to
+`Span<const float>`.
+
+**Possible Issues**
+
+Code that calls these functions may fail to compile.
+
+**Workaround**
+
+It should be easy to adjust the calling code to handle the new return and
+parameter types.
+
+**Rationale**
+
+The stroke options were extended and generalised to text rendering. The new
+types are a better fit for the adjusted design.
+
+
+## Change
+
+The `Drawable` class no longer inherits from `Component`.
+
+**Possible Issues**
+
+Code that depended on `Drawable` objects inheriting from `Component` will fail
+to compile.
+
+**Workaround**
+
+Affected code can use the new `DrawableComponent` class to wrap `Drawable`
+objects in a `Component` if necessary. There are many examples in the JUCE
+codebase where this transition has already been made.
+
+**Rationale**
+
+This change prepares the way for moving the `Drawable` classes together with the
+SVG parser into the juce_graphics module. This allows us to avoid a dependency
+on the heavyweight `Component` class and juce_gui_basics module, and enables
+using the `Drawable` classes and SVG parser in headless use-cases.
+
 
 ## Change
 

@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -86,30 +102,45 @@ public:
     }
 
     /** Returns a copy of these options with a new typeface style.
-        If the options include a non-null Typeface::Ptr, this will be ignored.
-        Otherwise, a suitable typeface will be located based on the typeface name and style strings.
+
+        If the options include a non-null Typeface::Ptr or a custom variable configuration, this
+        will be ignored. Otherwise, a suitable typeface will be located based on the typeface name
+        and style strings.
     */
     [[nodiscard]] FontOptions withStyle (String x) const
     {
-        if (typeface == nullptr)
+        if (typeface == nullptr && variables.empty())
             return withMember (*this, &FontOptions::style, x);
 
-        // This field will be ignored if the typeface pointer is non-null.
-        // If you want to set a custom style, first set the typeface pointer to null.
+        // This field will be ignored if the typeface pointer is non-null or a custom variable set
+        // has been applied. If you want to set a custom style, first set the typeface pointer to
+        // null and clear any variable settings.
         jassertfalse;
         return *this;
     }
 
+    /** Returns a copy of these options with a new typeface style. The style can be a combination
+        of the Font::bold, Font::italic and Font::underlined, or just Font::plain for the normal
+        style.
+        If the options include a non-null Typeface::Ptr, this will be ignored.
+        Otherwise, a suitable typeface will be located based on the typeface name and style strings.
+    */
+    [[nodiscard]] FontOptions withStyleFlags (int x) const;
+
     /** Returns a copy of these options with a new typeface.
-        If the typeface is non-null, it takes precedence over the name and style strings.
+        If the typeface is non-null, it takes precedence over the name, style strings or any variable
+        settings currently applied.
     */
     [[nodiscard]] FontOptions withTypeface (Typeface::Ptr x) const
     {
-        // If the typeface is non-null, then the name and style fields will be ignored.
+        // If the typeface is non-null, then the name, style, and variables fields will be ignored.
         jassert (x == nullptr || name.isEmpty());
         jassert (x == nullptr || style.isEmpty());
+        jassert (x == nullptr || variables.empty());
 
-        auto result = (x != nullptr ? withName (x->getName()).withStyle (x->getStyle()) : *this);
+        auto result = (x != nullptr ? withName (x->getName()).withStyle (x->getStyle())
+                                                             .withVariableSettings ({})
+                                    : *this);
         return withMember (std::move (result), &FontOptions::typeface, x);
     }
 
@@ -177,6 +208,54 @@ public:
     /** Returns a copy of these options with the specified feature disabled. */
     [[nodiscard]] FontOptions withFeatureDisabled (FontFeatureTag tag) const { return withFeatureSetting ({ tag, FontFeatureSetting::featureDisabled }); }
 
+    /** Returns a copy of these options with the specified variable setting.
+
+        @see Font:setVariableSettings, Typeface::getSupportedVariables, Typeface::getConfiguredVariables
+    */
+    [[nodiscard]] FontOptions withVariableSetting (FontVariableSetting variableSetting) const;
+
+    /** Returns a copy of these options with the specified variable settings.
+
+        This will replace any current variable settings configured.
+
+        @see Font:setVariableSettings, Typeface::getSupportedVariables, Typeface::getConfiguredVariables
+    */
+    [[nodiscard]] FontOptions withVariableSettings (Span<const FontVariableSetting> variableSettings) const;
+
+    /** Returns a copy of these options with the specified variable setting removed.
+
+        This removes any configured value for the given variable axis, causing the font to use the
+        axis's default value instead.
+
+        @param tag  The variable axis tag to remove (e.g., 'wght', 'wdth', 'slnt')
+
+        @see withVariableSetting, Typeface::getSupportedVariables
+    */
+    [[nodiscard]] FontOptions withVariableRemoved (FontFeatureTag tag) const;
+
+    /** Returns a copy of these options with Direct2D hinting enabled or disabled as specified.
+
+        The default state is enabled.
+
+        This option currently only has an effect when using the Direct2D renderer on Windows.
+
+        Some fonts can look substantially different under the Direct2D renderer when compared to
+        the software or OpenGL renderers. Fonts such as MS PGothic have hinted bitmaps for specific
+        font sizes, and these bitmaps may appear much thinner than the font outlines that are also
+        provided in the font. The software renderer always rasterises the font outlines, but
+        Direct2D will default to using the built-in bitmaps if present, which will more closely
+        match the intentions of the font designer. Disabling this option will cause the Direct2D
+        to rasterise the font outlines in a similar way to the software renderer, which will
+        produce a result that's closer to that of the software renderer (and therefore the legacy
+        JUCE behaviour).
+
+        @see getDirect2DHinting()
+    */
+    [[nodiscard]] FontOptions withDirect2DHinting (bool state) const
+    {
+        return withMember (*this, &FontOptions::direct2DHinting, state);
+    }
+
     /** @see withName() */
     [[nodiscard]] auto getName()             const { return name; }
     /** @see withStyle() */
@@ -208,6 +287,13 @@ public:
     [[nodiscard]] Span<const FontFeatureSetting> getFeatureSettings() const&  { return features; }
     [[nodiscard]] Span<const FontFeatureSetting> getFeatureSettings() const&& = delete;
 
+    /** @see withVariableSetting() */
+    [[nodiscard]] Span<const FontVariableSetting> getVariableSettings() const& { return variables; }
+    [[nodiscard]] Span<const FontVariableSetting> getVariableSettings() const&& = delete;
+
+    /** @see withDirect2DHinting() */
+    [[nodiscard]] bool getDirect2DHinting()   const { return direct2DHinting; }
+
     /** Equality operator. */
     [[nodiscard]] bool operator== (const FontOptions& other) const;
     /** Inequality operator. */
@@ -228,6 +314,7 @@ private:
     Typeface::Ptr typeface;
     std::vector<String> fallbacks;
     std::vector<FontFeatureSetting> features;
+    std::vector<FontVariableSetting> variables;
     TypefaceMetricsKind metricsKind { TypefaceMetricsKind::portable };
     float height = -1.0f;
     float pointHeight = -1.0f;
@@ -236,6 +323,7 @@ private:
     float ascentOverride = -1.0f;
     float descentOverride = -1.0f;
     bool fallbackEnabled = true;
+    bool direct2DHinting = true;
     bool underlined{};
 };
 

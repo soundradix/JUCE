@@ -54,7 +54,8 @@
 #include "../Assets/DemoUtilities.h"
 
 //==============================================================================
-class MultiTouchDemo final : public Component
+class MultiTouchDemo final : public Component,
+                             private ComponentMovementWatcher
 {
 public:
     class InputSource
@@ -129,10 +130,45 @@ public:
     };
 
     MultiTouchDemo()
+        : ComponentMovementWatcher (this)
     {
         setOpaque (true);
-        setSize (500, 500);
+
+        initSize();
     }
+
+    ~MultiTouchDemo() override
+    {
+        setUsingWindowsMultiTouch (false);
+    }
+
+    void componentMovedOrResized (bool, bool) override {}
+
+    void setUsingWindowsMultiTouch (bool shouldUseMultiTouch)
+    {
+        auto* peer = getPeer();
+
+        if (peer == nullptr)
+            return;
+
+        auto* window = dynamic_cast<TopLevelWindow*> (&peer->getComponent());
+
+        if (window == nullptr)
+            return;
+
+        window->setUsingWindowsMultiTouch (shouldUseMultiTouch);
+    }
+
+    void componentPeerChanged() override
+    {
+        setUsingWindowsMultiTouch (true);
+        initSize();
+    }
+
+    void componentVisibilityChanged() override {}
+
+    using ComponentMovementWatcher::componentVisibilityChanged;
+    using ComponentMovementWatcher::componentMovedOrResized;
 
     void paint (Graphics& g) override
     {
@@ -263,6 +299,12 @@ public:
     {
         sources.erase (std::remove_if (sources.begin(), sources.end(), sourceMatches (e.source)),
                        sources.end());
+    }
+
+private:
+    void initSize()
+    {
+        setSize (500, 500);
     }
 
     std::vector<std::unique_ptr<InputSource>> sources;

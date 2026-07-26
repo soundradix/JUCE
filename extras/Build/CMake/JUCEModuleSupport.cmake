@@ -1,16 +1,32 @@
 # ==============================================================================
 #
-#  This file is part of the JUCE 9 preview.
+#  This file is part of the JUCE framework.
 #  Copyright (c) Raw Material Software Limited
 #
-#  You may use this code under the terms of the AGPLv3
-#  (see www.gnu.org/licenses).
+#  JUCE is an open source framework subject to commercial or open source
+#  licensing.
 #
-#  For the JUCE 9 preview this file cannot be licensed commercially.
+#  By downloading, installing, or using the JUCE framework, or combining the
+#  JUCE framework with any other source code, object code, content or any other
+#  copyrightable work, you agree to the terms of the JUCE End User Licence
+#  Agreement, and all incorporated terms including the JUCE Privacy Policy and
+#  the JUCE Website Terms of Service, as applicable, which will bind you. If you
+#  do not agree to the terms of these agreements, we will not license the JUCE
+#  framework to you, and you must discontinue the installation or download
+#  process and cease use of the JUCE framework.
 #
-#  JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-#  EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-#  DISCLAIMED.
+#  JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+#  JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+#  JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+#
+#  Or:
+#
+#  You may also use this code under the terms of the AGPLv3:
+#  https://www.gnu.org/licenses/agpl-3.0.en.html
+#
+#  THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+#  WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+#  MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 #
 # ==============================================================================
 
@@ -562,6 +578,15 @@ function(juce_add_module module_path)
         target_link_libraries(${module_name} INTERFACE EGL $<IF:${platform_supports_gl3},GLESv3,GLESv2>)
     endif()
 
+    if(${module_name} STREQUAL "juce_gui_extra")
+        set(webview_interop_package_json "${module_path}/native/typescript/webview-interop/package.json")
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${webview_interop_package_json}")
+        file(READ "${webview_interop_package_json}" webview_interop_package_json_contents)
+        string(JSON webview_interop_version GET "${webview_interop_package_json_contents}" version)
+        target_compile_definitions(${module_name} INTERFACE
+            JUCE_WEBVIEW_INTEROP_LIBRARY_VERSION="${webview_interop_version}")
+    endif()
+
     _juce_extract_metadata_block(JUCE_MODULE_DECLARATION "${module_path}/${module_header_name}" metadata_dict)
 
     _juce_get_metadata("${metadata_dict}" minimumCppStandard module_cpp_standard)
@@ -671,4 +696,13 @@ function(_juce_fixup_module_source_groups)
             set_source_files_properties(${header_files} PROPERTIES HEADER_FILE_ONLY TRUE)
         endforeach()
     endif()
+endfunction()
+
+function(_juce_fixup_unity_property)
+    get_property(all_modules GLOBAL PROPERTY _juce_module_names)
+
+    foreach(module_name IN LISTS all_modules)
+        get_target_property(source_files ${module_name} INTERFACE_JUCE_MODULE_SOURCES)
+        set_source_files_properties(${source_files} PROPERTIES SKIP_UNITY_BUILD_INCLUSION TRUE)
+    endforeach()
 endfunction()

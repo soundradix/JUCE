@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -251,6 +267,50 @@ public:
             bool acceptsFirstMouse = true;
         };
 
+        /** Options specific to the WkWebView backend used on Linux systems. These options will be
+            ignored on other platforms.
+        */
+        class LinuxWkWebView
+        {
+        public:
+            /** Specifies whether the pinch-to-zoom and CTRL + wheel gestures are handled natively
+                by the WebView. This is disabled by default, and instead both events are propagated
+                to the page hosted by the WebView, where it can be handled as CTRL + wheel up/down
+                events.
+
+                If you enable this option the page no longer receives these events and the zoom
+                operation is instead carried out by the WebView unconditionally. This behaviour is
+                unlike any other OS implementation, hence the disabled default.
+            */
+            [[nodiscard]] LinuxWkWebView withNativeZoomGesture (bool x) const
+            {
+                return withMember (*this, &LinuxWkWebView::allowNativeZoomGesture, x);
+            }
+
+            /** A multiplier applied to deltaY parameter of the wheel event on Linux when the
+                default GTK to Javascript translation is enabled. The default value is 100.0f.
+
+                To disable this translation, call withNativeZoomGesture (true). After this no
+                wheel events will be received during touchpad pinch gestures.
+
+                @see withNativeZoomGesture
+             */
+            [[nodiscard]] LinuxWkWebView withPinchTranslationSensitivity (float x) const
+            {
+                return withMember (*this, &LinuxWkWebView::pinchTranslationSensitivity, x);
+            }
+
+            /** @see withNativeZoomGesture */
+            auto getAllowNativeZoomGesture() const { return allowNativeZoomGesture; }
+
+            /** @see withPinchTranslationSensitivity */
+            auto getPinchTranslationSensitivity() const { return pinchTranslationSensitivity; }
+
+        private:
+            bool allowNativeZoomGesture = false;
+            float pinchTranslationSensitivity = 100.0f;
+        };
+
         /** Specifies options that apply to the Windows implementation when the WebView2 feature is
             enabled.
 
@@ -266,6 +326,13 @@ public:
         [[nodiscard]] Options withAppleWkWebViewOptions (const AppleWkWebView& appleWkWebViewOptions) const
         {
             return withMember (*this, &Options::appleWkWebView, appleWkWebViewOptions);
+        }
+
+        /** Specifies options that influence the WebBrowserComponent's behaviour on Linux systems.
+        */
+        [[nodiscard]] Options withLinuxWkWebViewOptions (const LinuxWkWebView& linuxWkWebViewOptions) const
+        {
+            return withMember (*this, &Options::linuxWkWebView, linuxWkWebViewOptions);
         }
 
         /** Enables native integration features for the code running inside the WebBrowserComponent.
@@ -401,6 +468,7 @@ public:
         auto        getUserAgent() const                                 { return userAgent; }
         auto        getWinWebView2BackendOptions() const                 { return winWebView2; }
         auto        getAppleWkWebViewOptions() const                     { return appleWkWebView; }
+        auto        getLinuxWkWebViewOptions() const                     { return linuxWkWebView; }
         auto        getNativeIntegrationsEnabled() const                 { return enableNativeIntegration; }
         const auto& getNativeFunctions() const                           { return nativeFunctions; }
         const auto& getEventListeners() const                            { return eventListeners; }
@@ -418,6 +486,7 @@ public:
         String userAgent;
         WinWebView2 winWebView2;
         AppleWkWebView appleWkWebView;
+        LinuxWkWebView linuxWkWebView;
         std::map<Identifier, NativeFunction> nativeFunctions;
         std::vector<std::pair<Identifier, NativeEventListener>> eventListeners;
         StringArray userScripts;

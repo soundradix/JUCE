@@ -1,17 +1,33 @@
 /*
   ==============================================================================
 
-   This file is part of the JUCE 9 preview.
+   This file is part of the JUCE framework.
    Copyright (c) Raw Material Software Limited
 
-   You may use this code under the terms of the AGPLv3
-   (see www.gnu.org/licenses).
+   JUCE is an open source framework subject to commercial or open source
+   licensing.
 
-   For the JUCE 9 preview this file cannot be licensed commercially.
+   By downloading, installing, or using the JUCE framework, or combining the
+   JUCE framework with any other source code, object code, content or any other
+   copyrightable work, you agree to the terms of the JUCE End User Licence
+   Agreement, and all incorporated terms including the JUCE Privacy Policy and
+   the JUCE Website Terms of Service, as applicable, which will bind you. If you
+   do not agree to the terms of these agreements, we will not license the JUCE
+   framework to you, and you must discontinue the installation or download
+   process and cease use of the JUCE framework.
 
-   JUCE IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL WARRANTIES, WHETHER
-   EXPRESSED OR IMPLIED, INCLUDING MERCHANTABILITY AND FITNESS FOR PURPOSE, ARE
-   DISCLAIMED.
+   JUCE End User Licence Agreement: https://juce.com/legal/juce-9-licence/
+   JUCE Privacy Policy: https://juce.com/juce-privacy-policy
+   JUCE Website Terms of Service: https://juce.com/juce-website-terms-of-service/
+
+   Or:
+
+   You may also use this code under the terms of the AGPLv3:
+   https://www.gnu.org/licenses/agpl-3.0.en.html
+
+   THE JUCE FRAMEWORK IS PROVIDED "AS IS" WITHOUT ANY WARRANTY, AND ALL
+   WARRANTIES, WHETHER EXPRESSED OR IMPLIED, INCLUDING WARRANTY OF
+   MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, ARE DISCLAIMED.
 
   ==============================================================================
 */
@@ -322,6 +338,11 @@ public:
     */
     float getDescentInPoints() const;
 
+    /** Returns a distance in points that should be used in addition to the
+        ascent and descent between the baselines of successive lines of text.
+    */
+    float getLineGapInPoints() const;
+
     //==============================================================================
     /** Returns the font's style flags.
         This will return a bitwise-or'ed combination of values from the FontStyleFlags
@@ -372,8 +393,7 @@ public:
     //==============================================================================
     /** Returns an Span view of the features configured for this font instance.
 
-        Use Typeface::getSupportedFeatures() to determine what features this font
-        supports.
+        Use Typeface::getSupportedFeatures() to determine what features this font supports.
 
         @see setFeatureEnabled, setFeatureDisabled, removeFeature,
              Typeface::getSupportedFeatures
@@ -399,6 +419,53 @@ public:
         @see setFeatureEnabled, setFeatureDisabled, Typeface::getSupportedFeatures
     */
     void removeFeatureSetting (FontFeatureTag featureToRemove);
+
+    /** Replaces the current variable settings for this font.
+
+        Variable font settings control the interpolation between different font designs along axes
+        like weight, width, or slant.
+
+        Use Typeface::getSupportedVariables() to query which axes are available and their valid
+        ranges before setting values.
+
+        Unsupported or out-of-range variables will be removed or clamped respectively. This happens
+        at Typeface resolution (on first use or a call to getTypefacePtr).
+
+        @param variables  A span of variable settings to apply to the font
+
+        @see Typeface::getSupportedVariables
+    */
+    void setVariableSettings (Span<const FontVariableSetting> variables);
+
+    /** Removes a specific variable setting from this font.
+
+        @param variableToRemove  The tag identifying the variable axis to remove
+
+        @see setVariableSettings, getVariableSettings, Typeface::getSupportedVariables
+    */
+    void removeVariableSetting (FontFeatureTag variableToRemove);
+
+    /** Returns a copy of this font with the specified variable settings.
+
+        @param variables  A span of variable settings to apply to the font
+
+        @see setVariableSettings, getVariableSettings, Typeface::getSupportedVariables,
+             Typeface::getConfiguredVariables
+    */
+    [[nodiscard]] Font withVariableSettings (Span<const FontVariableSetting> variables) const;
+
+    /** Returns a Span of the variable settings configured for this font instance.
+
+        The settings are guaranteed to be sorted by tag.
+
+        Use Typeface::getSupportedVariables() to determine which variable axes this font supports
+        and their valid ranges.
+
+        @see setVariableSettings, withVariableSettings, Typeface::getSupportedVariables,
+             Typeface::getConfiguredVariables
+    */
+    Span<const FontVariableSetting> getVariableSettings() const&;
+    Span<const FontVariableSetting> getVariableSettings() const&& = delete;
 
     //==============================================================================
     /** Returns the font's horizontal scale.
@@ -504,6 +571,30 @@ public:
         @see setAscentOverride()
     */
     void setDescentOverride (std::optional<float>);
+
+    //==============================================================================
+    /** Set Direct2D hinting enabled or disabled as specified.
+
+        The default state is enabled.
+
+        This option currently only has an effect when using the Direct2D renderer on Windows.
+
+        Some typefaces can look substantially different under the Direct2D renderer when compared to
+        the software or OpenGL renderers. Fonts such as MS PGothic have hinted bitmaps for specific
+        font sizes, and these bitmaps may appear much thinner than the font outlines that are also
+        provided in the font. The software renderer always rasterises the font outlines, but
+        Direct2D will default to using the built-in bitmaps if present, which will more closely
+        match the intentions of the font designer. Disabling this option will cause the Direct2D
+        to rasterise the font outlines in a similar way to the software renderer, which will
+        produce a result that's closer to that of the software renderer (and therefore the legacy
+        JUCE behaviour).
+
+        @see getDirect2DHinting()
+    */
+    void setDirect2DHinting (bool);
+
+    /** @see setDirect2DHinting() */
+    bool getDirect2DHinting() const noexcept;
 
     //==============================================================================
     /** Changes all the font's characteristics with one call. */
@@ -617,6 +708,8 @@ public:
 private:
     //==============================================================================
     static bool compare (const Font&, const Font&) noexcept;
+    static StringArray findAllTypefaceNamesImpl();
+    static StringArray findAllTypefaceStylesImpl (const String&);
 
     void dupeInternalIfShared();
 
