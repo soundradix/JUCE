@@ -41,6 +41,11 @@ if(NOT (JUCE_IS_TOP_LEVEL OR "C" IN_LIST _juce_initial_global_languages))
         "Add 'C' to your project's LANGUAGES.")
 endif()
 
+if(NOT (JUCE_IS_TOP_LEVEL OR "C" IN_LIST _juce_initial_global_languages))
+    message(FATAL_ERROR "A C compiler is required to build targets that depend on JUCE. "
+        "Add 'C' to your project's LANGUAGES.")
+endif()
+
 include(CMakeDependentOption)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS YES)
