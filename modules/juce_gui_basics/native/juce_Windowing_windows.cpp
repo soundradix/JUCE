@@ -53,8 +53,9 @@ void* getUser32Function (const char*);
 
 #if JUCE_DEBUG
  int numActiveScopedDpiAwarenessDisablers = 0;
- extern HWND juce_messageWindowHandle;
 #endif
+
+extern HWND juce_messageWindowHandle;
 
 struct ScopedDeviceContext
 {
@@ -401,19 +402,25 @@ class ScopedThreadDPIAwarenessSetter::NativeImpl
 {
 public:
     explicit NativeImpl (HWND nativeWindow [[maybe_unused]])
+        : oldContext (std::invoke ([&]() -> DPI_AWARENESS_CONTEXT
+          {
+             #if JUCE_WIN_PER_MONITOR_DPI_AWARE
+              auto dpiAwareWindow = (GetAwarenessFromDpiAwarenessContext (GetWindowDpiAwarenessContext (nativeWindow))
+                                     == DPI_AWARENESS_PER_MONITOR_AWARE);
+
+              auto dpiAwareThread = (GetAwarenessFromDpiAwarenessContext (GetThreadDpiAwarenessContext())
+                                     == DPI_AWARENESS_PER_MONITOR_AWARE);
+
+              if (dpiAwareWindow && ! dpiAwareThread)
+                  return SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
+
+              if (! dpiAwareWindow && dpiAwareThread)
+                  return SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
+             #endif
+
+              return nullptr;
+          }))
     {
-       #if JUCE_WIN_PER_MONITOR_DPI_AWARE
-        auto dpiAwareWindow = (GetAwarenessFromDpiAwarenessContext (GetWindowDpiAwarenessContext (nativeWindow))
-                               == DPI_AWARENESS_PER_MONITOR_AWARE);
-
-        auto dpiAwareThread = (GetAwarenessFromDpiAwarenessContext (GetThreadDpiAwarenessContext())
-                               == DPI_AWARENESS_PER_MONITOR_AWARE);
-
-        if (dpiAwareWindow && ! dpiAwareThread)
-            oldContext = SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE);
-        else if (! dpiAwareWindow && dpiAwareThread)
-            oldContext = SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_UNAWARE);
-       #endif
     }
 
     ~NativeImpl()
@@ -5528,26 +5535,9 @@ bool detail::MouseInputSourceList::canUseTouch() const
     return canUseMultiTouch();
 }
 
-struct [[nodiscard]] ScopedThreadDpiAwarenessEnablement
-{
-    ~ScopedThreadDpiAwarenessEnablement()
-    {
-        if (prev.has_value())
-            SetThreadDpiAwarenessContext (*prev);
-    }
-
-    std::optional<DPI_AWARENESS_CONTEXT> prev = std::invoke ([]() -> std::optional<DPI_AWARENESS_CONTEXT>
-    {
-        if (GetThreadDpiAwarenessContext() == DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)
-            return {};
-
-        return SetThreadDpiAwarenessContext (DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
-    });
-};
-
 Point<float> MouseInputSource::getCurrentRawMousePosition()
 {
-    const ScopedThreadDpiAwarenessEnablement scope;
+    const ScopedThreadDPIAwarenessSetter::NativeImpl scope { juce_messageWindowHandle };
 
     POINT mousePos;
     GetCursorPos (&mousePos);
@@ -5558,7 +5548,7 @@ Point<float> MouseInputSource::getCurrentRawMousePosition()
 
 void MouseInputSource::setRawMousePosition (Point<float> newPosition)
 {
-    const ScopedThreadDpiAwarenessEnablement scope;
+    const ScopedThreadDPIAwarenessSetter::NativeImpl scope { juce_messageWindowHandle };
 
     const auto scaled = detail::ScalingHelpers::convertLogicalScreenPointToPhysical (newPosition);
     const auto point = D2DUtilities::toPOINT (scaled.roundToInt());
