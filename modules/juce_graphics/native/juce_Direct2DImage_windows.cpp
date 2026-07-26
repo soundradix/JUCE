@@ -915,6 +915,14 @@ void Direct2DPixelData::applySingleChannelBoxBlurEffectInArea (Rectangle<int> b,
             }
         }
 
+        if (begin == nullptr || end == nullptr)
+        {
+            // This can happen if the radius is 0. Even a non-zero radius passed to DropShadow can
+            // become 0 when a < 1.0 scale factor is applied to the Component with the shadow.
+            jassertfalse;
+            return nullptr;
+        }
+
         begin->SetInput (0, input);
         return end;
     });
