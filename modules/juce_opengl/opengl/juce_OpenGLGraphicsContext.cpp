@@ -1208,16 +1208,16 @@ struct StateHelpers
 
             if (currentActiveTexture == 0)
             {
-                bindTexture (quadQueue, texture1);
+                bindTexture (texture1);
                 setActiveTexture (1);
-                bindTexture (quadQueue, texture2);
+                bindTexture (texture2);
             }
             else
             {
                 setActiveTexture (1);
-                bindTexture (quadQueue, texture2);
+                bindTexture (texture2);
                 setActiveTexture (0);
-                bindTexture (quadQueue, texture1);
+                bindTexture (texture1);
             }
 
             JUCE_CHECK_OPENGL_ERROR
@@ -1233,8 +1233,7 @@ struct StateHelpers
             }
         }
 
-        template <typename QuadQueueType>
-        void bindTexture (QuadQueueType& quadQueue, GLuint textureID) noexcept
+        void bindTexture (GLuint textureID) noexcept
         {
             if (currentActiveTexture < 0 || numTextures <= currentActiveTexture)
             {
@@ -1244,7 +1243,6 @@ struct StateHelpers
 
             if (currentTextureID[currentActiveTexture] != textureID)
             {
-                quadQueue.flush();
                 currentTextureID[currentActiveTexture] = textureID;
                 glBindTexture (GL_TEXTURE_2D, textureID);
                 JUCE_CHECK_OPENGL_ERROR
@@ -1298,12 +1296,10 @@ struct StateHelpers
             gradientNeedsRefresh = true;
         }
 
-        template <typename QuadQueueType>
-        void bindTextureForGradient (QuadQueueType& quadQueue, ActiveTextures& activeTextures, const ColourGradient& gradient)
+        void bindTextureForGradient (ActiveTextures& activeTextures, const ColourGradient& gradient)
         {
             if (gradientNeedsRefresh)
             {
-                quadQueue.flush();
                 gradientNeedsRefresh = false;
 
                 if (gradientTextures.size() < numGradientTexturesToCache)
@@ -1323,7 +1319,7 @@ struct StateHelpers
                 gradientTextures.getUnchecked (activeGradientIndex)->loadARGB (lookup, gradientTextureSize, 1);
             }
 
-            activeTextures.bindTexture (quadQueue, gradientTextures.getUnchecked (activeGradientIndex)->getTextureID());
+            activeTextures.bindTexture (gradientTextures.getUnchecked (activeGradientIndex)->getTextureID());
         }
 
         enum { gradientTextureSize = 8 };
@@ -1671,6 +1667,7 @@ struct GLState : private ImagePixelData::Listener
                                    int maskTextureID, const Rectangle<int>* maskArea)
     {
         JUCE_CHECK_OPENGL_ERROR
+        activeTextures.disableTextures (shaderQuadQueue);
         blendMode.setBlendMode (shaderQuadQueue, BlendMode::sourceOver);
         JUCE_CHECK_OPENGL_ERROR
 
@@ -1678,14 +1675,14 @@ struct GLState : private ImagePixelData::Listener
         {
             activeTextures.setTexturesEnabled (shaderQuadQueue, 3);
             activeTextures.setActiveTexture (1);
-            activeTextures.bindTexture (shaderQuadQueue, (GLuint) maskTextureID);
+            activeTextures.bindTexture ((GLuint) maskTextureID);
             activeTextures.setActiveTexture (0);
-            textureCache.bindTextureForGradient (shaderQuadQueue, activeTextures, g);
+            textureCache.bindTextureForGradient (activeTextures, g);
         }
         else
         {
             activeTextures.setSingleTextureMode (shaderQuadQueue);
-            textureCache.bindTextureForGradient (shaderQuadQueue, activeTextures, g);
+            textureCache.bindTextureForGradient (activeTextures, g);
         }
 
         auto t = transform.translated (0.5f - (float) target.bounds.getX(),
@@ -1820,7 +1817,7 @@ struct GLState : private ImagePixelData::Listener
         else
         {
             activeTextures.setSingleTextureMode (shaderQuadQueue);
-            activeTextures.bindTexture (shaderQuadQueue, textureInfo.textureID);
+            activeTextures.bindTexture (textureInfo.textureID);
 
             if (isTiledFill)
             {
@@ -1863,7 +1860,7 @@ private:
     void imageDataBeingDeleted (ImagePixelData* ipd) override
     {
         observedPixelData.erase (ipd);
-        activeTextures.bindTexture (shaderQuadQueue, 0);
+        activeTextures.bindTexture (0);
     }
 
     void imageDataChanged (ImagePixelData*) override {}
@@ -1924,7 +1921,7 @@ struct SavedState final : public RenderingHelpers::SavedStateBase<SavedState>
                                             (int) (finishedLayerState.transparencyLayerAlpha * 255.0f),
                                             clipBounds.getX(), clipBounds.getY(), false);
 
-            state->activeTextures.bindTexture (state->shaderQuadQueue, 0);
+            state->activeTextures.bindTexture (0);
         }
     }
 
