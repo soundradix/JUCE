@@ -97,7 +97,7 @@ struct CachedImageList final : public ReferenceCountedObject,
             jassert (c->imageSize < maxCacheSize);
             totalSize += c->imageSize;
 
-            while (totalSize > maxCacheSize && images.size() > 1 && totalSize > 0)
+            while (totalSize > maxCacheSize && images.size() > 1)
                 removeOldestItem();
         }
 
@@ -109,7 +109,7 @@ struct CachedImageList final : public ReferenceCountedObject,
         CachedImage (CachedImageList& list, ImagePixelData* im)
             : owner (list), pixelData (im),
               lastUsed (Time::getCurrentTime()),
-              imageSize ((size_t) (im->width * im->height))
+              imageSize ((size_t) im->width * (size_t) im->height * sizeof (PixelARGB))
         {
             pixelData->listeners.add (&owner);
         }
@@ -1350,28 +1350,27 @@ struct StateHelpers
         {
             JUCE_CHECK_OPENGL_ERROR
 
-           #if JUCE_ANDROID || JUCE_IOS
-            int numQuads = maxNumQuads;
-           #else
-            GLint maxIndices = 0;
-            glGetIntegerv (GL_MAX_ELEMENTS_INDICES, &maxIndices);
-            auto numQuads = jmin ((int) maxNumQuads, (int) maxIndices / 6);
-            maxVertices = numQuads * 4 - 4;
-           #endif
+            const auto numQuads = getBatchSizeInQuads();
+            vertexData = CopyableHeapBlock<VertexInfo> ((size_t) numQuads * verticesPerQuad);
+            CopyableHeapBlock<IndexType> indexData ((size_t) numQuads * indicesPerQuad);
 
-            for (int i = 0, v = 0; i < numQuads * 6; i += 6, v += 4)
+            for (size_t i = 0, v = 0; i < indexData.size(); i += indicesPerQuad, v += verticesPerQuad)
             {
-                indexData[i] = (GLushort) v;
-                indexData[i + 1] = indexData[i + 3] = (GLushort) (v + 1);
-                indexData[i + 2] = indexData[i + 4] = (GLushort) (v + 2);
-                indexData[i + 5] = (GLushort) (v + 3);
+                indexData[i] = (IndexType) v;
+                indexData[i + 1] = indexData[i + 3] = (IndexType) (v + 1);
+                indexData[i + 2] = indexData[i + 4] = (IndexType) (v + 2);
+                indexData[i + 5] = (IndexType) (v + 3);
             }
 
             savedElementArrayBuffer.bind();
-            context.extensions.glBufferData (GL_ELEMENT_ARRAY_BUFFER, sizeof (indexData), indexData, GL_STATIC_DRAW);
+            context.extensions.glBufferData (GL_ELEMENT_ARRAY_BUFFER,
+                                             (GLsizeiptr) (indexData.size() * sizeof (IndexType)),
+                                             indexData.data(), GL_STATIC_DRAW);
 
             savedArrayBuffer.bind();
-            context.extensions.glBufferData (GL_ARRAY_BUFFER, sizeof (vertexData), vertexData, GL_STREAM_DRAW);
+            context.extensions.glBufferData (GL_ARRAY_BUFFER,
+                                             (GLsizeiptr) (vertexData.size() * sizeof (VertexInfo)),
+                                             nullptr, GL_STREAM_DRAW);
             JUCE_CHECK_OPENGL_ERROR
         }
 
@@ -1379,7 +1378,7 @@ struct StateHelpers
         {
             jassert (w > 0 && h > 0);
 
-            auto* v = vertexData + numVertices;
+            auto* v = vertexData.data() + numVertices;
             v[0].x = v[2].x = (GLshort) x;
             v[0].y = v[1].y = (GLshort) y;
             v[1].x = v[3].x = (GLshort) (x + w);
@@ -1398,9 +1397,9 @@ struct StateHelpers
             v[2].colour = rgba;
             v[3].colour = rgba;
 
-            numVertices += 4;
+            numVertices += verticesPerQuad;
 
-            if (numVertices > maxVertices)
+            if ((size_t) numVertices + verticesPerQuad > vertexData.size())
                 draw();
         }
 
@@ -1446,33 +1445,53 @@ struct StateHelpers
         }
 
     private:
+        using IndexType = GLushort;
+
+        static constexpr auto verticesPerQuad = 4;
+        static constexpr auto indicesPerQuad = 6;
+        static constexpr auto defaultNumQuads = 256;
+        static constexpr auto maxQuadsPerBatch = ((int) std::numeric_limits<IndexType>::max() + 1) / verticesPerQuad;
+
+        static int getBatchSizeInQuads() noexcept
+        {
+            if (OpenGLHelpers::isOpenGLES() && getOpenGLVersion().major < 3)
+                return defaultNumQuads;
+
+            GLint maxIndices = 0;
+            GLint maxVertices = 0;
+            glGetIntegerv (GL_MAX_ELEMENTS_INDICES, &maxIndices);
+            glGetIntegerv (GL_MAX_ELEMENTS_VERTICES, &maxVertices);
+
+            clearGLError();
+
+            if (maxIndices <= 0 || maxVertices <= 0)
+                return defaultNumQuads;
+
+            return jlimit (defaultNumQuads,
+                           maxQuadsPerBatch,
+                           jmin (maxIndices / indicesPerQuad, maxVertices / verticesPerQuad));
+        }
+
         struct VertexInfo
         {
             GLshort x, y;
             GLuint colour;
         };
 
-        enum { maxNumQuads = 256 };
-
         SavedBinding<TraitsArrayBuffer> savedArrayBuffer;
         SavedBinding<TraitsElementArrayBuffer> savedElementArrayBuffer;
-        VertexInfo vertexData[maxNumQuads * 4];
-        GLushort indexData[maxNumQuads * 6];
+        CopyableHeapBlock<VertexInfo> vertexData;
         const OpenGLContext& context;
         int numVertices = 0;
 
-       #if JUCE_ANDROID || JUCE_IOS
-        enum { maxVertices = maxNumQuads * 4 - 4 };
-       #else
-        int maxVertices = 0;
-       #endif
-
         void draw() noexcept
         {
-            context.extensions.glBufferSubData (GL_ARRAY_BUFFER, 0, (GLsizeiptr) ((size_t) numVertices * sizeof (VertexInfo)), vertexData);
+            context.extensions.glBufferData (GL_ARRAY_BUFFER,
+                                             (GLsizeiptr) ((size_t) numVertices * sizeof (VertexInfo)),
+                                             vertexData.data(), GL_STREAM_DRAW);
             // NB: If you get a random crash in here and are running in a Parallels VM, it seems to be a bug in
             // their driver. Can't find a workaround unfortunately.
-            glDrawElements (GL_TRIANGLES, (numVertices * 3) / 2, GL_UNSIGNED_SHORT, nullptr);
+            glDrawElements (GL_TRIANGLES, (numVertices / verticesPerQuad) * indicesPerQuad, GL_UNSIGNED_SHORT, nullptr);
             JUCE_CHECK_OPENGL_ERROR
             numVertices = 0;
         }
