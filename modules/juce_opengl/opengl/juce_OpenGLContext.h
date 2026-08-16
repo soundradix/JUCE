@@ -472,6 +472,9 @@ private:
 
     class CachedImage;
     class Attachment;
+
+    ListenerList<NativeContextListener> nativeContextListeners;
+
     NativeContext* nativeContext = nullptr;
     OpenGLRenderer* renderer = nullptr;
     double currentRenderScale = 1.0;
@@ -519,6 +522,7 @@ private:
     //==============================================================================
     CachedImage* getCachedImage() const noexcept;
     void execute (AsyncWorker::Ptr, bool);
+    void clearNativeContext();
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (OpenGLContext)
 };
