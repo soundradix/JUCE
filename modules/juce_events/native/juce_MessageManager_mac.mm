@@ -403,7 +403,7 @@ bool MessageManager::runDispatchLoopUntil (int millisecondsToRunFor)
         }
     }
 
-    return quitMessagePosted;
+    return ! quitMessagePosted;
 }
 #endif
 
@@ -432,9 +432,14 @@ void MessageManager::doPlatformSpecificShutdown()
 
 bool MessageManager::postMessageToSystemQueue (MessageBase* message)
 {
-    jassert (appDelegate != nil);
-    appDelegate->messageQueue.post (message);
-    return true;
+    if (appDelegate != nullptr)
+    {
+        appDelegate->messageQueue.post (message);
+        return true;
+    }
+
+    jassertfalse;
+    return false;
 }
 
 void MessageManager::broadcastMessage (const String& message)

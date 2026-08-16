@@ -36,30 +36,6 @@ namespace juce
 {
 
 //==============================================================================
-template <typename T>
-static T findNearestValue (const Array<T>& v, T target)
-{
-    if (v.begin() == v.end())
-    {
-        jassertfalse;
-        return T{};
-    }
-
-    const auto it = std::lower_bound (v.begin(), v.end(), target);
-
-    if (it == v.begin())
-        return *it;
-
-    if (it == v.end())
-        return *(it - 1);
-
-    const T upper = *it;
-    const T lower = *(it - 1);
-
-    return std::abs (target - lower) < std::abs (target - upper) ? lower : upper;
-}
-
-//==============================================================================
 class ScopedCFDictionary;
 
 class ScopedCFArray
@@ -597,19 +573,15 @@ private:
         UInt32 size{};
     };
 
-    bool hasProperty (PropertyAddress address) const
-    {
-        if (isValid() && AudioObjectHasProperty (objectId, address.get()))
-            return true;
-
-        JUCE_COREAUDIO_LOG (" Property not found!");
-        return false;
-    }
+    // We deliberately avoid AudioObjectHasProperty, for some properties on an
+    // Apogee Symphony I/O Mk2 it can lock up coreaudiod (likely a driver bug).
+    // Missing properties are detected instead when the Get/IsProperty* calls
+    // below fail through checkStatus.
 
     size_t getPropertySize (PropertyAddress address, DataType arg) const
     {
-        if (! hasProperty (address))
-            return 0;
+        if (! isValid())
+            return {};
 
         UInt32 size{};
 
@@ -623,7 +595,7 @@ private:
     template <typename PropertyType>
     bool copyPropertyData (PropertyAddress address, Span<PropertyType> property, DataType arg) const
     {
-        if (! hasProperty (address))
+        if (! isValid())
             return {};
 
         auto size = (UInt32) (property.getSizeInBytes());
@@ -663,7 +635,7 @@ private:
 
     bool isPropertySettable (PropertyAddress address) const
     {
-        if (! hasProperty (address))
+        if (! isValid())
             return {};
 
         Boolean isSettable = NO;
@@ -1216,7 +1188,7 @@ private:
             subDevice.setString (kAudioSubDeviceUIDKey, uid);
             subDevice.setInt (kAudioSubDeviceDriftCompensationKey, uid != clockingDeviceUid);
             subDevice.setInt (kAudioSubDeviceDriftCompensationQualityKey,
-                             #if JUCE_MAC_API_VERSION_CAN_BE_BUILT (13, 0)
+                             #if JUCE_MAC_API_VERSION_CAN_BE_BUILT (14, 0)
                               kAudioAggregateDriftCompensationHighQuality);
                              #else
                               kAudioSubDeviceDriftCompensationHighQuality);
@@ -1702,7 +1674,7 @@ private:
     {
         jassert (bufferSizesToTry.has_value() && ! bufferSizesToTry->isEmpty());
 
-        const auto nextBufferSize = findNearestValue (*bufferSizesToTry, coreAudioDevice.getBufferSize());
+        const auto nextBufferSize = findNearestValue (Span (*bufferSizesToTry), coreAudioDevice.getBufferSize());
         bufferSizesToTry->removeFirstMatchingValue (nextBufferSize);
 
         const auto bufferSize = requestBufferSize (nextBufferSize);
@@ -1736,7 +1708,7 @@ private:
     std::optional<double> requestSampleRate (double newSampleRate)
     {
         const auto sampleRates = juceDevice->getAvailableSampleRates();
-        const auto targetSampleRate = newSampleRate > 0.0 ? findNearestValue (sampleRates, newSampleRate)
+        const auto targetSampleRate = newSampleRate > 0.0 ? findNearestValue (Span (sampleRates), newSampleRate)
                                                           : coreAudioDevice.getSampleRate();
 
         const auto tryRequestingSampleRate = [&] (auto dev)
@@ -1758,7 +1730,7 @@ private:
     std::optional<int> requestBufferSize (int newBufferSize)
     {
         const auto sizes = juceDevice->getAvailableBufferSizes();
-        const auto targetBufferSize = newBufferSize > 0 ? findNearestValue (sizes, newBufferSize)
+        const auto targetBufferSize = newBufferSize > 0 ? findNearestValue (Span (sizes), newBufferSize)
                                                         : juceDevice->getDefaultBufferSize();
 
         JUCE_COREAUDIO_LOG ("Requesting buffer-size: ", targetBufferSize);

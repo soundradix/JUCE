@@ -557,7 +557,9 @@ private:
                 return windowSceneTracker->getWindowScene() != currentScene;
             }
 
-            return false;
+            // If we're on iOS 12 (or lower), this will only get called when setting up
+            // the peer, in which case we still want to handle the initial setup of the window.
+            return true;
         });
 
         if (! sceneDidChange)
@@ -2121,6 +2123,16 @@ void UIViewComponentPeer::handleTouches (UIEvent* event, MouseEventFlags mouseEv
             mask = UIEventButtonMaskPrimary;
 
         updateButtonMask (mask);
+    }
+    else
+    {
+        // iOS 12, we only have 'primary button' clicks
+        const auto newFlags = isUp (mouseEventFlags)
+                            ? 0
+                            : ModifierKeys::leftButtonModifier;
+        ModifierKeys::currentModifiers = ModifierKeys::getCurrentModifiers()
+                                            .withoutMouseButtons()
+                                            .withFlags (newFlags);
     }
 
     NSArray* touches = [[event touchesForView: view] allObjects];
