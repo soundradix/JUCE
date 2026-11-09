@@ -1,5 +1,143 @@
 # JUCE breaking changes
 
+# Version 8.0.17
+
+## Change
+
+ValueTree::readFromStream() and the related readFromData() and
+readFromGZIPData() functions now return an invalid ValueTree for data in
+which trees are nested more than 256 levels deep. var::readFromStream() now
+reads arrays nested more than 256 levels deep as void values.
+
+**Possible Issues**
+
+Such data, which can only have been produced by a tree or array that was
+itself nested more than 256 levels deep, will no longer be read back.
+
+**Workaround**
+
+Restructure the tree or array so that it is nested less deeply.
+
+**Rationale**
+
+Both readers recurse once for each level of nesting, so a malicious data block
+could use deep nesting to overflow the stack and crash an application. The
+limit matches the one applied to JSON and XML documents. The readers also no
+longer preallocate storage based on counts and sizes read from the data, which
+could previously be used to request a very large allocation.
+
+
+## Change
+
+JSON::parse() and JSON::fromString() now reject documents in which objects or
+arrays are nested more than 256 levels deep.
+
+**Possible Issues**
+
+Such documents will fail to parse. The Result returned by JSON::parse() will
+report "Objects or arrays are nested too deeply", and the other parsing
+functions will return a void var.
+
+**Workaround**
+
+Restructure the document so that it is nested less deeply.
+
+**Rationale**
+
+The parser recurses once for each level of nesting, so a malicious document
+could use deep nesting to overflow the stack and crash an application. The
+limit matches XmlDocument and sits within the range used by other JSON
+libraries, far beyond anything a real document needs.
+
+
+## Change
+
+XmlDocument now rejects documents in which elements are nested more than 256
+levels deep, in which entity references are nested more than 40 levels deep,
+or which build more than 8 MB of text while expanding entities when that is
+also more than 100 times the size of the document.
+
+**Possible Issues**
+
+Such documents will fail to parse, with getLastParseError() reporting
+"elements nested too deeply", "entities nested too deeply" or "entity
+expansion too large". Documents containing entities that refer to themselves,
+which previously crashed the parser, now fail with "recursive entity
+reference".
+
+**Workaround**
+
+Restructure the document so that it stays within these limits.
+
+**Rationale**
+
+The parser recurses once for each level of nesting, and previously expanded
+entities without limit. A malicious document could use either to crash an
+application or to exhaust its memory. These limits match those used by libxml2
+and expat, and are far beyond anything a real document needs.
+
+
+## Change
+
+XmlDocument no longer loads external DTD subsets or external parameter
+entities unless an InputSource has been supplied with setInputSource().
+
+**Possible Issues**
+
+Documents created from a File that rely on entity definitions held in a
+separate file, referenced through a SYSTEM identifier in their DOCTYPE
+declaration, will have those entities left unexpanded, and getLastParseError()
+will report an unknown entity. Documents parsed from a string were already
+treated this way.
+
+**Workaround**
+
+For documents from a trusted source, supply an input source explicitly:
+
+    XmlDocument document (file);
+    document.setInputSource (new FileInputSource (file));
+
+Otherwise, move the entity definitions into the document's internal DTD
+subset, or substitute the entities before parsing.
+
+**Rationale**
+
+A document could name any file as its external subset, and the parser would
+read it through the FileInputSource created for the document's File, which
+accepts absolute paths and parent-directory references. A malicious document
+could use this to read arbitrary files on the user's machine, so these
+references are now only followed through an input source that the caller has
+chosen to provide.
+
+
+## Change
+
+ZipFile::uncompressTo and ZipFile::uncompressEntry now refuse to create a
+symbolic link whose target does not stay inside the target directory, and fail
+an entry that holds more data than the size recorded in the archive's central
+directory.
+
+**Possible Issues**
+
+Archives containing symbolic links to absolute paths, to locations above the
+target directory, or to paths that contain ".." after a named component will
+no longer extract completely. The same applies to archives whose central
+directory understates the size of an entry.
+
+**Workaround**
+
+Extract the affected entries with createStreamForEntry() and handle them in
+application code.
+
+**Rationale**
+
+A symbolic link created from an untrusted archive could point anywhere on the
+user's machine, and anything that later opened or ran a path inside the
+extracted tree could be redirected outside it. Without a check against the
+recorded size, a small archive could also fill the disk, and callers had no way
+to bound the space that extraction would use.
+
+
 # Version 8.0.13
 
 ## Change
