@@ -670,9 +670,9 @@ function(_juce_generate_icon source_target dest_target)
             XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "${icon_composer_icon_name}")
 
         if((CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND (NOT CMAKE_GENERATOR STREQUAL "Xcode"))
-            add_custom_command(TARGET ${target} POST_BUILD
+            add_custom_command(TARGET ${dest_target} POST_BUILD
                 COMMAND "${CMAKE_COMMAND}"
-                    "-Dbundle_dir='$<TARGET_BUNDLE_DIR:${target}>'"
+                    "-Dbundle_dir='$<TARGET_BUNDLE_DIR:${dest_target}>'"
                     "-Dicon_path=${juce_property_icon_composer_bundle}"
                     "-P" "${JUCE_CMAKE_UTILS_DIR}/generateXcassetsFromIcon.cmake"
                 VERBATIM)
