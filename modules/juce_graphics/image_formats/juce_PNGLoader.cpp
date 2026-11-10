@@ -457,13 +457,13 @@ namespace PNGHelpers
         if (readHeader (in, pngReadStruct, pngInfoStruct, errorJumpBuf,
                         width, height, bitDepth, colorType, interlaceType))
         {
-            constexpr auto maxDimension = (png_uint_32) std::numeric_limits<int>::max();
+            constexpr auto maxDimension = (png_uint_32) ::std::numeric_limits<int>::max();
 
             if (width == 0 || height == 0 || maxDimension < width || maxDimension < height)
                 return Image();
 
             constexpr size_t bytesPerPixel = 4;
-            constexpr auto maxBytes = std::numeric_limits<size_t>::max();
+            constexpr auto maxBytes = ::std::numeric_limits<size_t>::max();
 
             if (maxBytes / bytesPerPixel < (size_t) width)
                 return Image();
