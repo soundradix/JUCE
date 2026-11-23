@@ -671,6 +671,11 @@ namespace AAXClasses
 
                 if ((aaxViewMods & AAX_eModifiers_Shift) != 0) modifierFlags |= ModifierKeys::shiftModifier;
                 if ((aaxViewMods & AAX_eModifiers_Alt )  != 0) modifierFlags |= ModifierKeys::altModifier;
+                if ((aaxViewMods & AAX_eModifiers_Cntl)  != 0) modifierFlags |= ModifierKeys::ctrlModifier;
+
+                // JUCE reads the other keys itself, but Pro Tools blocks this one;
+                // see AAX_IViewContainer::GetModifiers in Avid's AAX SDK.
+                if ((aaxViewMods & AAX_eModifiers_WINKEY) != 0) modifierFlags |= ModifierKeys::commandModifier;
             }
 
             return modifierFlags;
