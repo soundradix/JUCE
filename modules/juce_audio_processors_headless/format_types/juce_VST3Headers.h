@@ -140,6 +140,8 @@ JUCE_BEGIN_IGNORE_WARNINGS_GCC_LIKE ("-W#warnings",
  #include <public.sdk/source/vst/moduleinfo/moduleinfoparser.h>
 
  #include <juce_audio_processors_headless/format_types/pslextensions/ipslviewembedding.h>
+ #include <juce_audio_processors_headless/format_types/pslextensions/ipslcontextinfo.h>
+ #include <juce_audio_processors_headless/format_types/pslextensions/ipslgainreduction.h>
 #else
  // needed for VST_VERSION
  #include <pluginterfaces/vst/vsttypes.h>
