@@ -32,9 +32,77 @@
   ==============================================================================
 */
 
+class AAX_IComponentDescriptor;
+
 namespace juce
 {
 
+/**
+    A custom AAX algorithm, for a plug-in that replaces JUCE's native-only algorithm with its own:
+    one that also runs on Avid HDX DSP (TI), say, or that uses AAX Hybrid processing.
+
+    An AAX algorithm runs apart from the plug-in's data model (on HDX, on another chip), so it can't
+    call into the AudioProcessor. It sees only the fields of its context structure, which the
+    plug-in describes, and which the data model feeds with packets and private-data initialisation.
+
+    When AAXClientExtensions::getAAXCustomAlgorithm() returns one:
+    - JUCE calls describeComponent() for each main bus layout it registers, in place of adding its
+      own context fields and native ProcessProc. The plug-in adds its fields, properties and
+      ProcessProcs (native and/or TI).
+    - JUCE's own native algorithm never runs, so the AudioProcessor's processBlock() is called only
+      from AAX_IEffectParameters::RenderAudio_Hybrid(), when the algorithm registers for AAX Hybrid.
+      Its buffer holds the Hybrid audio the algorithm sends to the host, and returns the Hybrid audio
+      the host sends back to the algorithm. It carries no MIDI, and its playhead is the host's
+      transport, which runs ahead of the algorithm by AAX_IController::GetHybridSignalLatency().
+    - The data model forwards ResetFieldData() here, and calls postPackets() from
+      GenerateCoefficients() and from its periodic TimerWakeup().
+    - JUCE's master-bypass parameter posts no packet of its own; postPackets() gets its state.
+    - JUCE's AAX meters aren't connected: the algorithm adds any meter taps it needs.
+
+    @see AAXClientExtensions::getAAXCustomAlgorithm
+
+    @tags{Audio}
+*/
+struct JUCE_API AAXCustomAlgorithm
+{
+    /** Posts a packet to one of the algorithm's data-in ports (AAX_IController::PostPacket()). */
+    struct JUCE_API PacketPoster
+    {
+        virtual ~PacketPoster() = default;
+
+        /** Returns false when the host didn't take the packet. */
+        virtual bool postPacket (int32 fieldIndex, const void* payload, uint32 payloadSize) = 0;
+    };
+
+    virtual ~AAXCustomAlgorithm() = default;
+
+    /** Describes the algorithm component for one main bus layout: its context fields, properties
+        and ProcessProcs.
+
+        pluginIdNative is the id from AAXClientExtensions::getPluginIDForMainBusConfig(), which JUCE
+        has checked for uniqueness. Ids for the other platforms (e.g. TI) are the plug-in's own.
+    */
+    virtual void describeComponent (AAX_IComponentDescriptor& component,
+                                    const AudioChannelSet& mainInputLayout,
+                                    const AudioChannelSet& mainOutputLayout,
+                                    int32 pluginIdNative) const = 0;
+
+    /** Initialises a private-data field, as AAX_IEffectParameters::ResetFieldData(). */
+    virtual void resetFieldData (int32 fieldIndex, void* data, uint32 dataSize) const = 0;
+
+    /** Posts the algorithm's packets. Called on the host's non-real-time threads.
+
+        postAll is true from GenerateCoefficients(), where every port's packet should be posted, and
+        false from the periodic TimerWakeup() (about every 30 ms), where posting what changed is
+        enough.
+
+        @note HDX drops packets posted outside GenerateCoefficients() to ports 16 and 24
+              (PT-206161), so give any port posted when postAll is false another field index.
+    */
+    virtual void postPackets (PacketPoster& poster, bool isBypassed, bool postAll) = 0;
+};
+
+//==============================================================================
 /**
     An interface to allow an AudioProcessor to implement extended AAX-specific functionality.
 
@@ -87,6 +155,14 @@ struct JUCE_API AAXClientExtensions
         @see getPageFileName
     */
     virtual File getPageFileSearchPath() const { return {}; }
+
+    /** Returns an algorithm that replaces JUCE's native AAX algorithm, or nullptr (the default) to
+        keep JUCE's. It's queried on the temporary instance JUCE describes the plug-in with, and on
+        each instance's data model.
+
+        @see AAXCustomAlgorithm
+    */
+    virtual AAXCustomAlgorithm* getAAXCustomAlgorithm() const { return nullptr; }
 };
 
 } // namespace juce

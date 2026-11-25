@@ -1327,6 +1327,12 @@ namespace AAXClasses
 
         AAX_Result ResetFieldData (AAX_CFieldIndex fieldIndex, void* data, uint32_t dataSize) const override
         {
+            if (customAlgorithm != nullptr)
+            {
+                customAlgorithm->resetFieldData ((int32) fieldIndex, data, (uint32) dataSize);
+                return AAX_SUCCESS;
+            }
+
             switch (fieldIndex)
             {
                 case JUCEAlgorithmIDs::pluginInstance:
@@ -1403,6 +1409,29 @@ namespace AAXClasses
             setAudioProcessorParameter (paramID, value);
 
             return result;
+        }
+
+        AAX_Result GenerateCoefficients() override
+        {
+            const auto result = AAX_CEffectParameters::GenerateCoefficients();
+            postCustomAlgorithmPackets (true);
+            return result;
+        }
+
+        AAX_Result TimerWakeup() override
+        {
+            const auto result = AAX_CEffectParameters::TimerWakeup();
+            postCustomAlgorithmPackets (false);
+            return result;
+        }
+
+        AAX_Result RenderAudio_Hybrid (AAX_SHybridRenderInfo* info) override
+        {
+            if (customAlgorithm == nullptr || info == nullptr)
+                return AAX_CEffectParameters::RenderAudio_Hybrid (info);
+
+            renderHybrid (*info);
+            return AAX_SUCCESS;
         }
 
         AAX_Result GetParameterValueFromString (AAX_CParamID paramID, double* result, const AAX_IString& text) const override
@@ -2025,6 +2054,94 @@ namespace AAXClasses
         friend class JuceAAX_GUI;
         friend void AAX_CALLBACK AAXClasses::algorithmProcessCallback (JUCEAlgorithmContext* const instancesBegin[], const void* const instancesEnd);
 
+        bool isHostBypassed() const
+        {
+            const auto* bypass = pluginInstance->getBypassParameter();
+
+            if (bypass == nullptr)
+                bypass = ownedBypassParameter.get();
+
+            return bypass != nullptr && bypass->getValue() >= 0.5f;
+        }
+
+        void postCustomAlgorithmPackets (bool postAll)
+        {
+            if (customAlgorithm == nullptr)
+                return;
+
+            struct ControllerPacketPoster final : public AAXCustomAlgorithm::PacketPoster
+            {
+                explicit ControllerPacketPoster (AAX_IController* c) : controller (c) {}
+
+                bool postPacket (int32 fieldIndex, const void* payload, uint32 payloadSize) override
+                {
+                    return controller != nullptr
+                        && controller->PostPacket ((AAX_CFieldIndex) fieldIndex, payload, (uint32_t) payloadSize) == AAX_SUCCESS;
+                }
+
+                AAX_IController* controller;
+            };
+
+            ControllerPacketPoster poster { Controller() };
+            customAlgorithm->postPackets (poster, isHostBypassed(), postAll);
+        }
+
+        // The Hybrid render of a custom algorithm: processBlock gets the audio the algorithm sends to
+        // the host, and returns the audio the host sends back.
+        void renderHybrid (const AAX_SHybridRenderInfo& info)
+        {
+            const auto numIns     = info.mNumAudioInputs  != nullptr && info.mAudioInputs  != nullptr ? (int) *info.mNumAudioInputs  : 0;
+            const auto numOuts    = info.mNumAudioOutputs != nullptr && info.mAudioOutputs != nullptr ? (int) *info.mNumAudioOutputs : 0;
+            const auto numSamples = info.mNumSamples != nullptr ? (int) *info.mNumSamples : 0;
+
+            if (numSamples <= 0)
+                return;
+
+            const ScopedLock sl (pluginInstance->getCallbackLock());
+
+            if (! isPrepared || pluginInstance->isSuspended())
+            {
+                for (int ch = 0; ch < numOuts; ++ch)
+                    FloatVectorOperations::clear (info.mAudioOutputs[ch], numSamples);
+
+                return;
+            }
+
+            if (lastBufferSize != numSamples)
+            {
+                lastBufferSize = numSamples;
+                pluginInstance->setRateAndBufferSizeDetails (sampleRate, lastBufferSize);
+
+                // Hybrid buffers may be larger than the 1024-sample ProcessProc maximum JUCE
+                // prepares for, so this can reallocate once on the render thread.
+                if (numSamples > maxBufferSize)
+                    prepareProcessorWithSampleRateAndBufferSize (sampleRate, numSamples);
+            }
+
+            // Grows only on the first render or a larger buffer: Hybrid stems are fixed per instance.
+            const auto numChannels = jmax (numIns, numOuts);
+            hybridBuffer.setSize (numChannels, numSamples, false, false, true);
+
+            for (int ch = 0; ch < numChannels; ++ch)
+            {
+                if (ch < numIns)
+                    hybridBuffer.copyFrom (ch, 0, info.mAudioInputs[ch], numSamples);
+                else
+                    hybridBuffer.clear (ch, 0, numSamples);
+            }
+
+            AudioBuffer<float> buffer (hybridBuffer.getArrayOfWritePointers(), numChannels, numSamples);
+            midiBuffer.clear();
+
+            if (isHostBypassed() && pluginInstance->getBypassParameter() == nullptr)
+                pluginInstance->processBlockBypassed (buffer, midiBuffer);
+            else
+                pluginInstance->processBlock (buffer, midiBuffer);
+
+            for (int ch = 0; ch < numOuts; ++ch)
+                FloatVectorOperations::copy (info.mAudioOutputs[ch], buffer.getReadPointer (ch), numSamples);
+        }
+
         void process (float* const* channels,
                       const int numChans,
                       const int bufferSize,
@@ -2187,7 +2304,7 @@ namespace AAXClasses
 
                 mParameterManager.AddParameter (parameter);
 
-                if (isBypassParameter)
+                if (isBypassParameter && customAlgorithm == nullptr)
                     mPacketDispatcher.RegisterPacket (aaxParamID, JUCEAlgorithmIDs::bypass);
             }
         }
@@ -2683,6 +2800,10 @@ namespace AAXClasses
         const bool supportsMidiIn  = supportsMidiInput  (*pluginInstance);
         const bool supportsMidiOut = supportsMidiOutput (*pluginInstance);
 
+        // Non-null when the plug-in replaces JUCE's native algorithm (see AAXCustomAlgorithm).
+        AAXCustomAlgorithm* const customAlgorithm = pluginInstance->getAAXClientExtensions().getAAXCustomAlgorithm();
+        AudioBuffer<float> hybridBuffer;
+
         /*  Pro Tools 2021 sends TransportStateChanged on the main thread, but we read
             the recording state on the audio thread.
             I'm not sure whether Pro Tools ensures that these calls are mutually
@@ -2922,6 +3043,21 @@ namespace AAXClasses
                                   const int numMeters,
                                   const bool canARA)
     {
+        if (const auto* customAlgorithm = processor.getAAXClientExtensions().getAAXCustomAlgorithm())
+        {
+            const auto& mainIn  = fullLayout.getMainInputChannelSet();
+            const auto& mainOut = fullLayout.getMainOutputChannelSet();
+            const auto pluginID = processor.getAAXClientExtensions().getPluginIDForMainBusConfig (mainIn, mainOut, false);
+
+            // The plugin id generated from your AudioProcessor's getAAXPluginIDForMainBusConfig callback
+            // it not unique. Please fix your implementation!
+            jassert (! pluginIds.contains (pluginID));
+            pluginIds.add (pluginID);
+
+            customAlgorithm->describeComponent (desc, mainIn, mainOut, pluginID);
+            return;
+        }
+
         [[maybe_unused]] auto aaxInputFormat  = getFormatForAudioChannelSet (fullLayout.getMainInputChannelSet(),  false);
         [[maybe_unused]] auto aaxOutputFormat = getFormatForAudioChannelSet (fullLayout.getMainOutputChannelSet(), false);
 
