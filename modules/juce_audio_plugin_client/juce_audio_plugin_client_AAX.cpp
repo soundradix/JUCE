@@ -1327,11 +1327,13 @@ namespace AAXClasses
 
         AAX_Result ResetFieldData (AAX_CFieldIndex fieldIndex, void* data, uint32_t dataSize) const override
         {
+           #if JucePlugin_AAXCustomAlgorithm
             if (customAlgorithm != nullptr)
             {
                 customAlgorithm->resetFieldData ((int32) fieldIndex, data, (uint32) dataSize);
                 return AAX_SUCCESS;
             }
+           #endif
 
             switch (fieldIndex)
             {
@@ -1411,6 +1413,7 @@ namespace AAXClasses
             return result;
         }
 
+       #if JucePlugin_AAXCustomAlgorithm
         AAX_Result GenerateCoefficients() override
         {
             const auto result = AAX_CEffectParameters::GenerateCoefficients();
@@ -1433,6 +1436,7 @@ namespace AAXClasses
             renderHybrid (*info);
             return AAX_SUCCESS;
         }
+       #endif
 
         AAX_Result GetParameterValueFromString (AAX_CParamID paramID, double* result, const AAX_IString& text) const override
         {
@@ -2054,6 +2058,7 @@ namespace AAXClasses
         friend class JuceAAX_GUI;
         friend void AAX_CALLBACK AAXClasses::algorithmProcessCallback (JUCEAlgorithmContext* const instancesBegin[], const void* const instancesEnd);
 
+       #if JucePlugin_AAXCustomAlgorithm
         bool isHostBypassed() const
         {
             const auto* bypass = pluginInstance->getBypassParameter();
@@ -2141,6 +2146,7 @@ namespace AAXClasses
             for (int ch = 0; ch < numOuts; ++ch)
                 FloatVectorOperations::copy (info.mAudioOutputs[ch], buffer.getReadPointer (ch), numSamples);
         }
+       #endif
 
         void process (float* const* channels,
                       const int numChans,
@@ -2304,7 +2310,12 @@ namespace AAXClasses
 
                 mParameterManager.AddParameter (parameter);
 
+               #if JucePlugin_AAXCustomAlgorithm
+                // A custom algorithm's bypass travels in its own packets.
                 if (isBypassParameter && customAlgorithm == nullptr)
+               #else
+                if (isBypassParameter)
+               #endif
                     mPacketDispatcher.RegisterPacket (aaxParamID, JUCEAlgorithmIDs::bypass);
             }
         }
@@ -2800,9 +2811,11 @@ namespace AAXClasses
         const bool supportsMidiIn  = supportsMidiInput  (*pluginInstance);
         const bool supportsMidiOut = supportsMidiOutput (*pluginInstance);
 
+       #if JucePlugin_AAXCustomAlgorithm
         // Non-null when the plug-in replaces JUCE's native algorithm (see AAXCustomAlgorithm).
         AAXCustomAlgorithm* const customAlgorithm = pluginInstance->getAAXClientExtensions().getAAXCustomAlgorithm();
         AudioBuffer<float> hybridBuffer;
+       #endif
 
         /*  Pro Tools 2021 sends TransportStateChanged on the main thread, but we read
             the recording state on the audio thread.
@@ -3043,6 +3056,7 @@ namespace AAXClasses
                                   const int numMeters,
                                   const bool canARA)
     {
+       #if JucePlugin_AAXCustomAlgorithm
         if (const auto* customAlgorithm = processor.getAAXClientExtensions().getAAXCustomAlgorithm())
         {
             const auto& mainIn  = fullLayout.getMainInputChannelSet();
@@ -3057,6 +3071,10 @@ namespace AAXClasses
             customAlgorithm->describeComponent (desc, mainIn, mainOut, pluginID);
             return;
         }
+       #else
+        // Your plug-in returns a custom AAX algorithm: set JucePlugin_AAXCustomAlgorithm=1 for JUCE to use it.
+        jassert (processor.getAAXClientExtensions().getAAXCustomAlgorithm() == nullptr);
+       #endif
 
         [[maybe_unused]] auto aaxInputFormat  = getFormatForAudioChannelSet (fullLayout.getMainInputChannelSet(),  false);
         [[maybe_unused]] auto aaxOutputFormat = getFormatForAudioChannelSet (fullLayout.getMainOutputChannelSet(), false);

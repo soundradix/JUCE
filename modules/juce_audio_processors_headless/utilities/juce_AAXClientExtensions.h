@@ -45,7 +45,9 @@ namespace juce
     call into the AudioProcessor. It sees only the fields of its context structure, which the
     plug-in describes, and which the data model feeds with packets and private-data initialisation.
 
-    When AAXClientExtensions::getAAXCustomAlgorithm() returns one:
+    JUCE's AAX wrapper uses one only when the plug-in sets JucePlugin_AAXCustomAlgorithm=1, and
+    otherwise compiles without any of this. When it's set and
+    AAXClientExtensions::getAAXCustomAlgorithm() returns an algorithm:
     - JUCE calls describeComponent() for each main bus layout it registers, in place of adding its
       own context fields and native ProcessProc. The plug-in adds its fields, properties and
       ProcessProcs (native and/or TI).
@@ -158,7 +160,7 @@ struct JUCE_API AAXClientExtensions
 
     /** Returns an algorithm that replaces JUCE's native AAX algorithm, or nullptr (the default) to
         keep JUCE's. It's queried on the temporary instance JUCE describes the plug-in with, and on
-        each instance's data model.
+        each instance's data model, and only when the plug-in sets JucePlugin_AAXCustomAlgorithm=1.
 
         @see AAXCustomAlgorithm
     */
